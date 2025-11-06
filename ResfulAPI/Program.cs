@@ -1,18 +1,19 @@
 ﻿using ResfulAPI.Extensions;
 using Microsoft.OpenApi.Models;
-using ResfulAPI.Extensions;
 using FluentValidation;
 using FluentValidation.Results;
 using Serilog;
+using Microsoft.AspNetCore.WebSockets;
+using ResfulAPI.Services;
+
 var builder = WebApplication.CreateBuilder(args);
-// Add services to the container.
 
 var builderLog = new ConfigurationBuilder()
-                    .SetBasePath(Directory.GetCurrentDirectory())  // location of the exe file
-                    .AddJsonFile("logsettings.json", optional: true, reloadOnChange: true);
+       .SetBasePath(Directory.GetCurrentDirectory())
+      .AddJsonFile("logsettings.json", optional: true, reloadOnChange: true);
 IConfigurationRoot configuration = builderLog.Build();
 Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(configuration)
+ .ReadFrom.Configuration(configuration)
     .CreateLogger();
 builder.Host.UseSerilog();
 
@@ -28,37 +29,47 @@ _services.AddCORS(MyAllowSpecificOrigins);
 _services.AddCoreService();
 _services.AddMemoryCache();
 
+// Register TcpClientService
+_services.AddScoped<ITcpClientService, TcpClientService>();
+
+// Configure WebSocket options
+_services.AddWebSockets(options =>
+{
+    options.KeepAliveInterval = TimeSpan.FromMinutes(2);
+    options.ReceiveBufferSize = 4 * 1024; // 4KB
+});
+
 _services.AddControllers().ConfigureApiBehaviorOptions(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
     {
-        var errors = context.ModelState
-            .Where(ms => ms.Value.Errors.Count > 0)
-            .ToDictionary(
-                ms => ms.Key,
-                ms => ms.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-            );
+    var errors = context.ModelState
+       .Where(ms => ms.Value.Errors.Count > 0)
+     .ToDictionary(
+         ms => ms.Key,
+          ms => ms.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+       );
 
-        throw new ValidationException(
-            errors.SelectMany(kv => kv.Value.Select(error => new ValidationFailure(kv.Key, error)))
-        );
+      throw new ValidationException(
+       errors.SelectMany(kv => kv.Value.Select(error => new ValidationFailure(kv.Key, error)))
+      );
     };
 });
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 _services.AddEndpointsApiExplorer();
 _services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Version = "v1.0.0",
-        Title = "My Project",
+   Version = "v1.0.0",
+     Title = "My Project",
         Description = "My Project api documents"
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        In = ParameterLocation.Header,
-        Description = "Please enter a valid token",
+    In = ParameterLocation.Header,
+     Description = "Please enter a valid token",
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
         BearerFormat = "JWT",
@@ -66,34 +77,40 @@ _services.AddSwaggerGen(options =>
     });
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type=ReferenceType.SecurityScheme,
-                    Id="Bearer"
-                }
-            },
-            new string[]{}
+  {
+       new OpenApiSecurityScheme
+         {
+     Reference = new OpenApiReference
+       {
+     Type=ReferenceType.SecurityScheme,
+         Id="Bearer"
+       }
+         },
+       new string[]{}
         }
     });
-
 });
+
 var app = builder.Build();
-//DbInitializer.ConfigureCoreDb(app);
-// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
+
 app.UseSwagger();
 app.UseSwaggerUI();
-//}
+
+// Enable CORS first
+app.UseCors(MyAllowSpecificOrigins);
 
 app.UseHttpsRedirection();
-app.UseCors(MyAllowSpecificOrigins);
 app.UseStaticFiles();
+
+// Enable WebSockets
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromMinutes(2)
+});
+
 app.UseAuthorization();
 app.UseMiddleware<ErrorHandlerMiddleware>();
+app.UseMiddleware<ResfulAPI.Extensions.WebSocketMiddleware>();
 app.MapControllers();
 
 app.Run();
