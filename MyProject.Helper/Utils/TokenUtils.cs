@@ -1,6 +1,6 @@
 ﻿using MyProject.Helper.Utils.Interfaces;
-using MyProject.Helper.Module;
 using System.Security.Claims;
+using MyProject.Helper.ModelHelps;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;

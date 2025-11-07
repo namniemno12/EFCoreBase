@@ -1,15 +1,17 @@
-﻿using Microsoft.EntityFrameworkCore;
-using MyProject.Application.Services.Interfaces;
+﻿using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.EntityFrameworkCore;
+using MyProject.Application.Common.Mapping;
 using MyProject.Application.Services;
+using MyProject.Application.Services.Interfaces;
+using MyProject.Helper.ModelHelps;
+using MyProject.Helper.Utils;
+using MyProject.Helper.Utils.Interfaces;
+using MyProject.Infrastructure;
 using MyProject.Infrastructure.Persistence.HandleContext;
 using MyProject.Infrastructure.Repository;
-using MyProject.Infrastructure;
 using System.Reflection;
-using FluentValidation.AspNetCore;
-using FluentValidation;
 using System.Security.Claims;
-using MyProject.Helper.ModelHelps;
-using MyProject.Application.Common.Mapping;
 
 namespace ResfulAPI.Extensions
 {
@@ -76,6 +78,7 @@ namespace ResfulAPI.Extensions
             // Application Services
             services.AddTransient<ITesttiepService, TesttiepService>();
             services.AddTransient<INguyenService, NguyenService>();
+            services.AddTransient<ITokenUtils, TokenUtils>();
 
             // Repository + UoW
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
