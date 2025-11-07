@@ -1,15 +1,17 @@
-﻿using Microsoft.EntityFrameworkCore;
-using MyProject.Application.Services.Interfaces;
-using MyProject.Application.Services;
+﻿using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.EntityFrameworkCore;
+using MyProject.Application.Common.Mapping;
+using MyProject.Application.TcpSocket;
+using MyProject.Application.TcpSocket.Interfaces;
+using MyProject.Application.WebSockets;
+using MyProject.Application.WebSockets.Interfaces;
+using MyProject.Helper.ModelHelps;
+using MyProject.Infrastructure;
 using MyProject.Infrastructure.Persistence.HandleContext;
 using MyProject.Infrastructure.Repository;
-using MyProject.Infrastructure;
 using System.Reflection;
-using FluentValidation.AspNetCore;
-using FluentValidation;
 using System.Security.Claims;
-using MyProject.Helper.ModelHelps;
-using MyProject.Application.Common.Mapping;
 
 namespace ResfulAPI.Extensions
 {
@@ -45,7 +47,7 @@ namespace ResfulAPI.Extensions
             {
                 options.UseSqlServer(connectionString);
                 // Nếu cần bật audit thì bỏ comment
-                 options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
+                options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
             });
 
             return services;
@@ -74,9 +76,7 @@ namespace ResfulAPI.Extensions
         public static IServiceCollection AddCoreService(this IServiceCollection services)
         {
             // Application Services
-            services.AddTransient<ITesttiepService, TesttiepService>();
-            services.AddTransient<INguyenService, NguyenService>();
-
+            services.AddTransient<ITcpSocketService, TcpSocketService>();
             // Repository + UoW
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
             services.AddScoped(typeof(IRepository<,>), typeof(Repository<,>));
@@ -93,6 +93,16 @@ namespace ResfulAPI.Extensions
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             //services.AddSingleton<ISessionService, SessionService>();
             //services.AddSingleton<IRedisService, RedisService>();
+            services.AddSingleton<IWebSocketManager, WebSocketManager>();
+            services.AddSingleton<IWebSocketService, WebSocketService>();
+            services.AddSingleton<TcpSocketServer>(sp =>
+            {
+                var wsService = sp.GetRequiredService<IWebSocketService>();
+                return new TcpSocketServer(9000, wsService);
+            });
+
+            // Register hosted service to run TCP server
+            services.AddHostedService<TcpSocketHostedService>();
 
             return services;
         }

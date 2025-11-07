@@ -28,8 +28,6 @@ public class ApplicationDbContext : DbContext
         optionsBuilder.UseSqlServer("Server=DESKTOP-ADMIN\\SQLEXPRESS;Database=StreamieDB2;Trusted_Connection=True;");
     }
 
-    public DbSet<NguyenEntity> NguyenEntities { get; set; }
-    public DbSet<Testtiep> Testtieps { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

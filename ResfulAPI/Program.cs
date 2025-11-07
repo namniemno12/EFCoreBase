@@ -4,7 +4,6 @@ using FluentValidation;
 using FluentValidation.Results;
 using Serilog;
 using Microsoft.AspNetCore.WebSockets;
-using ResfulAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,8 +28,6 @@ _services.AddCORS(MyAllowSpecificOrigins);
 _services.AddCoreService();
 _services.AddMemoryCache();
 
-// Register TcpClientService
-_services.AddScoped<ITcpClientService, TcpClientService>();
 
 // Configure WebSocket options
 _services.AddWebSockets(options =>
@@ -43,16 +40,16 @@ _services.AddControllers().ConfigureApiBehaviorOptions(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
     {
-    var errors = context.ModelState
-       .Where(ms => ms.Value.Errors.Count > 0)
-     .ToDictionary(
-         ms => ms.Key,
-          ms => ms.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-       );
+        var errors = context.ModelState
+           .Where(ms => ms.Value.Errors.Count > 0)
+         .ToDictionary(
+             ms => ms.Key,
+              ms => ms.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+           );
 
-      throw new ValidationException(
-       errors.SelectMany(kv => kv.Value.Select(error => new ValidationFailure(kv.Key, error)))
-      );
+        throw new ValidationException(
+         errors.SelectMany(kv => kv.Value.Select(error => new ValidationFailure(kv.Key, error)))
+        );
     };
 });
 
@@ -61,15 +58,15 @@ _services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-   Version = "v1.0.0",
-     Title = "My Project",
+        Version = "v1.0.0",
+        Title = "My Project",
         Description = "My Project api documents"
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-    In = ParameterLocation.Header,
-     Description = "Please enter a valid token",
+        In = ParameterLocation.Header,
+        Description = "Please enter a valid token",
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
         BearerFormat = "JWT",
