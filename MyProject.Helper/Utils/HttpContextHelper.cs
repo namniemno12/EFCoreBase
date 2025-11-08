@@ -11,14 +11,14 @@ namespace MyProject.Helper.Utils
             _httpContextAccessor = httpContextAccessor;
         }
 
-        public static long GetUserId()
+        public static Guid GetUserId()
         {
             if (_httpContextAccessor?.HttpContext == null)
             {
-                return 0;
+                return Guid.Empty;
             }
 
-            return (long)(_httpContextAccessor.HttpContext.Items["UserId"] ?? 0);
+            return (Guid)(_httpContextAccessor.HttpContext.Items["UserId"] ?? Guid.Empty);
         }
     }
 }

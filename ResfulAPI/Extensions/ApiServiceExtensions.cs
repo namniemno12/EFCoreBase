@@ -2,11 +2,15 @@
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using MyProject.Application.Common.Mapping;
+using MyProject.Application.Services;
+using MyProject.Application.Services.Interfaces;
 using MyProject.Application.TcpSocket;
 using MyProject.Application.TcpSocket.Interfaces;
 using MyProject.Application.WebSockets;
 using MyProject.Application.WebSockets.Interfaces;
 using MyProject.Helper.ModelHelps;
+using MyProject.Helper.Utils;
+using MyProject.Helper.Utils.Interfaces;
 using MyProject.Infrastructure;
 using MyProject.Infrastructure.Persistence.HandleContext;
 using MyProject.Infrastructure.Repository;
@@ -76,13 +80,16 @@ namespace ResfulAPI.Extensions
         public static IServiceCollection AddCoreService(this IServiceCollection services)
         {
             // Application Services
-            services.AddTransient<ITcpSocketService, TcpSocketService>();
+            services.AddSingleton<ITcpSocketService, TcpSocketService>();
+            services.AddScoped<IAuthServices, AuthServices>();
+            services.AddScoped<CryptoHelperUtil>();
             // Repository + UoW
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
             services.AddScoped(typeof(IRepository<,>), typeof(Repository<,>));
             services.AddScoped(typeof(IUnitOfWork<>), typeof(UnitOfWork<>));
             services.AddScoped(typeof(IRepositoryAsync<>), typeof(SingleDbRepositoryAsync<>));
-
+            services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.AddScoped<ITokenUtils, TokenUtils>();
             // Session
             services.AddSession(options =>
             {
@@ -91,17 +98,17 @@ namespace ResfulAPI.Extensions
 
             // Singleton
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            //services.AddSingleton<ISessionService, SessionService>();
             //services.AddSingleton<IRedisService, RedisService>();
             services.AddSingleton<IWebSocketManager, WebSocketManager>();
             services.AddSingleton<IWebSocketService, WebSocketService>();
-            services.AddSingleton<TcpSocketServer>(sp =>
+            services.AddScoped<TcpSocketServer>(sp =>
             {
                 var wsService = sp.GetRequiredService<IWebSocketService>();
-                return new TcpSocketServer(9000, wsService);
+                var authServices = sp.GetRequiredService<IAuthServices>();
+                return new TcpSocketServer(9000, wsService, authServices);
             });
 
-            // Register hosted service to run TCP server
+            // Đăng ký HostedService
             services.AddHostedService<TcpSocketHostedService>();
 
             return services;

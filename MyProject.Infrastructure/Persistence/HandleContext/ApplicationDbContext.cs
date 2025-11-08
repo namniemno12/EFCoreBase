@@ -25,21 +25,22 @@ public class ApplicationDbContext : DbContext
     {
         base.OnConfiguring(optionsBuilder);
         optionsBuilder.LogTo(Console.WriteLine);
-        optionsBuilder.UseSqlServer("Server=DESKTOP-ADMIN\\SQLEXPRESS;Database=StreamieDB2;Trusted_Connection=True;");
+        optionsBuilder.UseSqlServer("Server=.;Database=Prj;Trusted_Connection=True;TrustServerCertificate=True;");
     }
 
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<Users> Users { get; set; }
+    public DbSet<Roles> Roles { get; set; }
+    public DbSet<LoginHistory> LoginHistories { get; set; }
+    public DbSet<LoginRequest> LoginRequests { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplySoftDeleteGlobalFilter();
         modelBuilder.ApplyAuditPrecision();
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        //modelBuilder.Entity<NguyenEntity>().ToTable("NGUYEN");
-        //modelBuilder.Entity<NguyenEntity>(entity => { entity.HasKey(c => c.Id); });
-
-        //modelBuilder.Entity<Testtiep>().ToTable("EntityTest");
-        //modelBuilder.Entity<Testtiep>(entity => { entity.HasKey(c => c.Id); });
+        DbSeedData.Seed(modelBuilder);
     }
 }

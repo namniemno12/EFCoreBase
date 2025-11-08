@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using MyProject.Domain.DTOs.Auth;
+using MyProject.Domain.DTOs.Auth.Req;
 using MyProject.Helper.Constants.Globals;
 using MyProject.Helper.Utils;
 using MyProject.Helper.Utils.Interfaces;

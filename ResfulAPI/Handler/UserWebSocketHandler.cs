@@ -11,9 +11,9 @@ namespace ResfulAPI.Handler
             _webSocket = webSocket;
             _webSocketManager = webSocketManager;
         }
-        public async Task HandleWebSocketAsync(long playerId, string hub)
+        public async Task HandleWebSocketAsync(string userName, string hub)
         {
-            await _webSocketManager.AddUserSocketAsync(hub, playerId.ToString(), _webSocket);
+            await _webSocketManager.AddUserSocketAsync(hub, userName, _webSocket);
 
             try
             {
@@ -28,7 +28,7 @@ namespace ResfulAPI.Handler
             }
             finally
             {
-                await _webSocketManager.RemoveUserSocketAsync(hub, playerId.ToString());
+                await _webSocketManager.RemoveUserSocketAsync(hub, userName);
                 await _webSocketManager.HandleDisconnectAsync(_webSocket);
                 await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
             }

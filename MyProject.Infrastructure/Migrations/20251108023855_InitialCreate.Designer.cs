@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MyProject.Infrastructure.Persistence.HandleContext;
 
@@ -11,9 +12,11 @@ using MyProject.Infrastructure.Persistence.HandleContext;
 namespace MyProject.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251108023855_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -149,20 +152,6 @@ namespace MyProject.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Roles");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("dad41708-e38d-4674-b47b-012a26ec0274"),
-                            CreatedAt = new DateTime(2025, 11, 8, 3, 6, 4, 159, DateTimeKind.Utc),
-                            Name = "Admin"
-                        },
-                        new
-                        {
-                            Id = new Guid("5f6f9c3c-a55e-4537-942d-3a9aabba88ba"),
-                            CreatedAt = new DateTime(2025, 11, 8, 3, 6, 4, 159, DateTimeKind.Utc),
-                            Name = "User"
-                        });
                 });
 
             modelBuilder.Entity("MyProject.Domain.Entities.Users", b =>
@@ -212,19 +201,6 @@ namespace MyProject.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("0449a75f-afa0-45bf-939d-b78b12f832d6"),
-                            CreatedAt = new DateTime(2025, 11, 8, 3, 6, 4, 160, DateTimeKind.Utc),
-                            Email = "admin@yourdomain.com",
-                            FullName = "Administrator",
-                            IsActive = true,
-                            PasswordHash = "o5_OeffS5AwBG7EycB6RCrWfKbB0pRvSoEA13EXo5a4",
-                            RoleId = new Guid("dad41708-e38d-4674-b47b-012a26ec0274"),
-                            UserName = "admin"
-                        });
                 });
 #pragma warning restore 612, 618
         }

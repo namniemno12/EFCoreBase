@@ -4,10 +4,10 @@
     {
         //string GenerateJwt(User user, IList<string> roles);
 
-        string GenerateToken(long id);
-        string GenerateRefreshToken(long id);
+        string GenerateToken(Guid id);
+        string GenerateRefreshToken(Guid id);
         string? GenerateTokenFromRefreshToken(string refreshToken);
-        long? ValidateToken(string token);
+        Guid? ValidateToken(string token);
         bool IsAccessTokenExpired(string accessToken);
     }
 }

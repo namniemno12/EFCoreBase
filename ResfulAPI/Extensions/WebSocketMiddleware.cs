@@ -1,5 +1,6 @@
-﻿using System.Net.WebSockets;
+﻿using MyProject.Helper.Utils.Interfaces;
 using ResfulAPI.Handler;
+using System.Net.WebSockets;
 namespace ResfulAPI.Extensions
 {
     public class WebSocketMiddleware
@@ -16,37 +17,41 @@ namespace ResfulAPI.Extensions
         {
             if (context.WebSockets.IsWebSocketRequest)
             {
-                try
-                {
-                    using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                    switch (context.Request.Path.Value)
-                    {
-                        case "/ws/AdminGroup":
-                            {
-                                var adminHandler = new AdminWebSocketHandler(webSocket, _webSocketManager);
-                                await adminHandler.HandleWebSocketAsync(123, "AdminGroup");
-                                break;
-                            }
-                        case "/ws/UserConnection":
-                            {
-                                var userHandler = new UserWebSocketHandler(webSocket, _webSocketManager);
-                                await userHandler.HandleWebSocketAsync(123, "NotifyLogin");
-                                break;
-                            }
-                        default:
-                            if (webSocket.State == WebSocketState.Open)
-                            {
-                                await webSocket.CloseAsync(
-                                    WebSocketCloseStatus.InvalidPayloadData,
-                                    "Invalid path",
-                                    CancellationToken.None);
-                            }
-                            break;
-                    }
-                }
-                catch (Exception ex)
+                var username = context.Request.Query["username"].ToString();
+                var token = context.Request.Query["access_token"].ToString();
+                var utilsServices = context.RequestServices.GetService<ITokenUtils>();
+
+                Guid? userId = null;
+                if (!string.IsNullOrEmpty(token))
                 {
+                    userId = utilsServices?.ValidateToken(token);
+                }
+
+                switch (context.Request.Path.Value)
+                {
+                    case "/ws/AdminGroup":
+                        {
+                            var adminHandler = new AdminWebSocketHandler(webSocket, _webSocketManager);
+                            await adminHandler.HandleWebSocketAsync(userId?.ToString() ?? "Anonymous", "AdminGroup");
+                            break;
+                        }
+                    case "/ws/UserConnection":
+                        {
+                            var userHandler = new UserWebSocketHandler(webSocket, _webSocketManager);
+                            await userHandler.HandleWebSocketAsync(username ?? "Anonymous", "NotifyLogin");
+                            break;
+                        }
+                    default:
+                        if (webSocket.State == WebSocketState.Open)
+                        {
+                            await webSocket.CloseAsync(
+                                WebSocketCloseStatus.InvalidPayloadData,
+                                "Invalid path",
+                                CancellationToken.None);
+                        }
+                        break;
                 }
             }
             else

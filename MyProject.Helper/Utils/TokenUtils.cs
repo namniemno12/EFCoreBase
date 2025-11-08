@@ -1,10 +1,10 @@
 ﻿using MyProject.Helper.Utils.Interfaces;
-using MyProject.Helper.Module;
 using System.Security.Claims;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
+using MyProject.Helper.ModelHelps;
 
 namespace MyProject.Helper.Utils
 {
@@ -49,7 +49,7 @@ namespace MyProject.Helper.Utils
         //    return new JwtSecurityTokenHandler().WriteToken(token);
         //}
 
-        public string GenerateToken(long id)
+        public string GenerateToken(Guid id)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_jwtSettings.Secret);
@@ -67,7 +67,7 @@ namespace MyProject.Helper.Utils
             return tokenHandler.WriteToken(token);
         }
 
-        public string GenerateRefreshToken(long id)
+        public string GenerateRefreshToken(Guid id)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_jwtSettings.Secret);
@@ -93,10 +93,10 @@ namespace MyProject.Helper.Utils
             var adminId = ValidateToken(refreshToken);
             if (adminId == null) return null;
 
-            return GenerateToken((long)adminId);
+            return GenerateToken((Guid)adminId);
         }
 
-        public long? ValidateToken(string token)
+        public Guid? ValidateToken(string token)
         {
             if (string.IsNullOrEmpty(token))
                 return null;
@@ -120,7 +120,7 @@ namespace MyProject.Helper.Utils
                 }, out SecurityToken validatedToken);
 
                 var jwtToken = (JwtSecurityToken)validatedToken;
-                var userId = long.Parse(jwtToken.Claims.First(x => x.Type == "id").Value);
+                var userId = Guid.Parse(jwtToken.Claims.First(x => x.Type == "id").Value);
 
                 return userId;
             }

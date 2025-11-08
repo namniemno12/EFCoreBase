@@ -11,6 +11,7 @@
         ERR_DDOS = -402,
         ERR_API_NOT_FOUND = -403,
         ERR_WALLET_EXIST = -405,
+        ERR_NOT_FOUND = -409,
         ERR_SESSION = -406,
         ERR_TIME_OUT = -408,
         ERR_SYMTEM = -500,

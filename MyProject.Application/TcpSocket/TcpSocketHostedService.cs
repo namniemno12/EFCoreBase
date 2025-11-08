@@ -1,19 +1,22 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace MyProject.Application.TcpSocket
 {
     public class TcpSocketHostedService : BackgroundService
     {
-        private readonly TcpSocketServer _tcpServer;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public TcpSocketHostedService(TcpSocketServer tcpServer)
+        public TcpSocketHostedService(IServiceScopeFactory scopeFactory)
         {
-            _tcpServer = tcpServer;
+            _scopeFactory = scopeFactory;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await _tcpServer.StartAsync(stoppingToken);
+            using var scope = _scopeFactory.CreateScope();
+            var tcpServer = scope.ServiceProvider.GetRequiredService<TcpSocketServer>();
+            await tcpServer.StartAsync(stoppingToken);
         }
     }
 }

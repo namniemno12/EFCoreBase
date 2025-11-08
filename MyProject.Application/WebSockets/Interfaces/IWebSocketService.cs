@@ -1,8 +1,10 @@
-﻿namespace MyProject.Application.WebSockets.Interfaces
+﻿using MyProject.Domain.DTOs.Auth.Res;
+
+namespace MyProject.Application.WebSockets.Interfaces
 {
     public interface IWebSocketService
     {
-        Task NotifyAdminsUserLoggedInAsync(string message);
-        Task NotifyUserByAdminAsync(string userId, string message);
+        Task NotifyAdminsUserLoggedInAsync(GetLoginRequestRes req);
+        Task NotifyUserByAdminAsync(string userId, int Status);
     }
 }

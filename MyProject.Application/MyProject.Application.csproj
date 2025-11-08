@@ -18,8 +18,4 @@
     <ProjectReference Include="..\MyProject.Infrastructure\MyProject.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Services\Interfaces\" />
-  </ItemGroup>
-
 </Project>

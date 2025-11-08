@@ -11,7 +11,7 @@ namespace ResfulAPI.Handler
             _webSocket = webSocket;
             _webSocketManager = webSocketManager;
         }
-        public async Task HandleWebSocketAsync(long playerId, string hub)
+        public async Task HandleWebSocketAsync(string playerId, string hub)
         {
             await _webSocketManager.AddToGroupAsync(hub, _webSocket);
 
