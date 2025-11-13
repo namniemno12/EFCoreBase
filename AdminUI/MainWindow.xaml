@@ -1,0 +1,237 @@
+﻿<Window x:Class="AdminUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Admin Control Panel" Height="800" Width="1400"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5">
+    <Grid>
+        <!-- Background Gradient -->
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#1e3c72" Offset="0"/>
+                <GradientStop Color="#2a5298" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <!-- Main Container -->
+        <Border Background="White" CornerRadius="15" Margin="30">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="20" ShadowDepth="0"/>
+            </Border.Effect>
+
+            <Grid Margin="30">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Border Grid.Row="0" Background="#1e3c72" CornerRadius="10" Padding="25,20" Margin="0,0,0,25">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🛡️" FontSize="36" Margin="0,0,15,0"/>
+                            <StackPanel>
+                                <TextBlock Text="Admin Control Panel" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Login Request Management System" FontSize="13" Foreground="#B0C4DE" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <StackPanel Margin="0,0,20,0">
+                                <TextBlock Text="Admin ID" FontSize="10" Foreground="#B0C4DE" Margin="0,0,0,3"/>
+                                <TextBlock x:Name="AdminIdTextBlock" FontSize="11" Foreground="White" FontFamily="Consolas"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Status" FontSize="10" Foreground="#B0C4DE" Margin="0,0,0,3"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse x:Name="AdminStatusIndicator" Width="10" Height="10" Fill="Red" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="AdminStatusText" Text="Disconnected" FontSize="11" Foreground="White"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Admin Info and Connect -->
+                <Border Grid.Row="1" Background="#F8F9FA" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Admin Name:" FontSize="14" Foreground="#666" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                            <TextBox x:Name="AdminNameTextBox" Width="200" Height="35" Padding="10" FontSize="13"
+                                     VerticalContentAlignment="Center" IsReadOnly="True"/>
+
+                            <TextBlock Text="Total Pending:" FontSize="14" Foreground="#666" Margin="40,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TotalPendingTextBlock" Text="0" FontSize="18" FontWeight="Bold" Foreground="#FF6B6B" 
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Login Requests DataGrid -->
+                <Border Grid.Row="2" Background="White" BorderBrush="#E0E0E0" 
+                       BorderThickness="1" CornerRadius="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- DataGrid Header -->
+                        <Border Background="#F8F9FA" Padding="15,10" 
+                              BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                            <TextBlock Text="📋 Pending Login Requests" FontSize="16" 
+                                       FontWeight="SemiBold" Foreground="#333"/>
+                        </Border>
+
+                        <!-- DataGrid -->
+                        <DataGrid x:Name="LoginRequestsDataGrid" Grid.Row="1"
+                                AutoGenerateColumns="False" 
+                                CanUserAddRows="False"
+                                CanUserDeleteRows="False"
+                                IsReadOnly="True"
+                                SelectionMode="Single"
+                                GridLinesVisibility="Horizontal"
+                                HeadersVisibility="Column"
+                                RowHeight="50"
+                                FontSize="13"
+                                BorderThickness="0"
+                                Background="White"
+                                AlternatingRowBackground="#F8F9FA">
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Request ID" Binding="{Binding LoginRequestId}" 
+                                                  Width="100" FontFamily="Consolas" FontSize="11"/>
+                                <DataGridTextColumn Header="User Name" Binding="{Binding UserName}" 
+                                                    Width="150" FontWeight="SemiBold"/>
+                                <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" 
+                                                    Width="100" FontFamily="Consolas" FontSize="11"/>
+                                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" 
+                                                    Width="120"/>
+                                <DataGridTextColumn Header="Device Info" Binding="{Binding DeviceInfo}" 
+                                                    Width="*"/>
+                                <DataGridTextColumn Header="Requested At" 
+                                                  Binding="{Binding RequestedAt, StringFormat='yyyy-MM-dd HH:mm:ss'}" 
+                                                  Width="150"/>
+
+                                <!-- Actions Column -->
+                                <DataGridTemplateColumn Header="Actions" Width="220">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" 
+                                                        HorizontalAlignment="Center">
+                                                <Button Content="✓ Approve" Width="95" Height="32"
+                                                        Background="#4CAF50" Foreground="White"
+                                                        BorderThickness="0" Margin="0,0,10,0"
+                                                        Cursor="Hand" FontWeight="SemiBold"
+                                                        Click="ApproveButton_Click"
+                                                        Tag="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}" 
+                                                                                CornerRadius="5" Padding="8">
+                                                                            <ContentPresenter HorizontalAlignment="Center" 
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="#45a049"/>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+
+                                                <Button Content="✕ Reject" Width="95" Height="32"
+                                                        Background="#F44336" Foreground="White"
+                                                        BorderThickness="0" Cursor="Hand" FontWeight="SemiBold"
+                                                        Click="RejectButton_Click"
+                                                        Tag="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}" 
+                                                                                CornerRadius="5" Padding="8">
+                                                                            <ContentPresenter HorizontalAlignment="Center" 
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="#da190b"/>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+
+                            <DataGrid.ColumnHeaderStyle>
+                                <Style TargetType="DataGridColumnHeader">
+                                    <Setter Property="Background" Value="#1e3c72"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="Padding" Value="10"/>
+                                    <Setter Property="Height" Value="40"/>
+                                </Style>
+                            </DataGrid.ColumnHeaderStyle>
+
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#E3F2FD"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                        </DataGrid>
+                    </Grid>
+                </Border>
+
+                <!-- Activity Log -->
+                <Border Grid.Row="3" Background="#F8F9FA" CornerRadius="10" 
+                        Padding="15" Margin="0,20,0,0" Height="150">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="📝 Activity Log" FontSize="13" FontWeight="SemiBold" 
+                                   Foreground="#666" Margin="0,0,0,10"/>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="ActivityLogTextBlock" FontSize="11" 
+                                       Foreground="#666" TextWrapping="Wrap" FontFamily="Consolas"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -25,7 +25,6 @@ public class ApplicationDbContext : DbContext
     {
         base.OnConfiguring(optionsBuilder);
         optionsBuilder.LogTo(Console.WriteLine);
-        optionsBuilder.UseSqlServer("Server=.;Database=Prj;Trusted_Connection=True;TrustServerCertificate=True;");
     }
 
     public DbSet<AuditLog> AuditLogs { get; set; }

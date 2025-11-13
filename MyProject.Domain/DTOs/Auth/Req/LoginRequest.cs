@@ -33,6 +33,7 @@
     {
         public string? AccessToken { get; set; }
         public string? RefreshToken { get; set; }
+        public Guid? AdminId { get; set; }
     }
     public class LoginCmsDTO
     {

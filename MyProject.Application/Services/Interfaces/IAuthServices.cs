@@ -9,7 +9,6 @@ namespace MyProject.Application.Services.Interfaces
         Task<CommonResponse<string>> Register(RegisterReq req);
         Task<CommonResponse<string>> AddLoginHistory(AddLoginHistoryReq req);
         Task<CommonResponse<GetLoginRequestRes>> AddLoginRequest(AddLoginRequestReq req);
-        Task<CommonResponse<string>> LoginByUser(LoginCmsRequest req);
         Task<CommonResponse<LoginCmsResponse>> LoginByAdmin(LoginCmsRequest req);
         Task<CommonPagination<List<GetLoginRequestRes>>> GetLoginRequest(int? Status, string? UserName, int CurrentPage, int RecordPerPage);
         Task<CommonResponse<string>> AcceptLoginRequest(Guid AdminId, AcceptLoginRequestReq req);

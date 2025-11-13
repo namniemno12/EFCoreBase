@@ -14,7 +14,10 @@ namespace MyProject.Helper.Utils
 
         public CryptoHelperUtil(IConfiguration configuration)
         {
-            _secretKey = configuration["EncryptionSettings:SecretKey"];
+        // ✅ Try multiple config paths for backward compatibility
+            _secretKey = configuration["Crypto:SecretKey"] 
+ ?? configuration["EncryptionSettings:SecretKey"]
+               ?? throw new InvalidOperationException("Encryption secret key not found in configuration. Please add 'Crypto:SecretKey' or 'EncryptionSettings:SecretKey' to appsettings.json");
         }
 
         public string Encrypt(string plainText)
@@ -41,6 +44,11 @@ namespace MyProject.Helper.Utils
 
         public string Decrypt(string encryptedText)
         {
+            if (string.IsNullOrWhiteSpace(encryptedText))
+            {
+                throw new ArgumentException("Encrypted text cannot be null or empty", nameof(encryptedText));
+            }
+
             byte[] encryptedBytes = Base64UrlDecode(encryptedText);
 
             using (Aes aes = Aes.Create())

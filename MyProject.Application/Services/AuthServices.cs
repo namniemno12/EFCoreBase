@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using MyProject.Application.Services.Interfaces;
-using MyProject.Application.TcpSocket.Interfaces;
 using MyProject.Domain.DTOs.Auth.Req;
 using MyProject.Domain.DTOs.Auth.Res;
 using MyProject.Domain.Entities;
@@ -21,21 +20,35 @@ namespace MyProject.Application.Services
         private readonly IRepositoryAsync<LoginHistory> _loginHistoryRepository;
         private readonly IRepositoryAsync<LoginRequest> _loginRequestRepository;
         private readonly CryptoHelperUtil _cryptoHelperUtil;
-        private readonly ITcpSocketService _tcpSocketService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IHttpContextAccessor? _httpContextAccessor;
         private readonly ITokenUtils _tokenUtils;
-        public AuthServices(IRepositoryAsync<Users> userRepository, IRepositoryAsync<Roles> roleRepository, CryptoHelperUtil cryptoHelperUtil, IRepositoryAsync<LoginHistory> loginHistoryRepository, IRepositoryAsync<LoginRequest> loginRequestRepository, ITcpSocketService tcpSocketService, IHttpContextAccessor httpContextAccessor, ITokenUtils tokenUtils)
+
+        /// <summary>
+        /// Constructor for AuthServices with optional TCP Socket and HTTP Context
+        /// - TCP Server: Only needs repositories, crypto, and token utils
+        /// - Web API: Needs all dependencies including HTTP context and TCP socket
+        /// </summary>
+        public AuthServices(
+          IRepositoryAsync<Users> userRepository,
+     IRepositoryAsync<Roles> roleRepository,
+ CryptoHelperUtil cryptoHelperUtil,
+     IRepositoryAsync<LoginHistory> loginHistoryRepository,
+            IRepositoryAsync<LoginRequest> loginRequestRepository,
+        ITokenUtils tokenUtils,
+            IHttpContextAccessor? httpContextAccessor = null)
         {
             _userRepository = userRepository;
             _roleRepository = roleRepository;
             _cryptoHelperUtil = cryptoHelperUtil;
             _loginHistoryRepository = loginHistoryRepository;
             _loginRequestRepository = loginRequestRepository;
-            _tcpSocketService = tcpSocketService;
             _httpContextAccessor = httpContextAccessor;
             _tokenUtils = tokenUtils;
         }
 
+        /// <summary>
+        /// Add Login History - Được gọi từ TCP Server khi admin approve
+        /// </summary>
         public async Task<CommonResponse<string>> AddLoginHistory(AddLoginHistoryReq req)
         {
             if (req.UserId == Guid.Empty)
@@ -60,13 +73,16 @@ namespace MyProject.Application.Services
             return CommonResponse<string>.Success(loginHistory.Id.ToString(), ResponseCodeEnum.SUCCESS, "Thêm lịch sử đăng nhập thành công");
         }
 
+        /// <summary>
+        /// Add Login Request - Được gọi từ TCP Server khi client gửi login request
+        /// </summary>
         public async Task<CommonResponse<GetLoginRequestRes>> AddLoginRequest(AddLoginRequestReq req)
         {
             if (req.UserId == Guid.Empty)
                 return CommonResponse<GetLoginRequestRes>.Fail(ResponseCodeEnum.ERR_WRONG_INPUT, "Thiếu UserId");
 
             var user = await _userRepository.AsQueryable()
-                                            .FirstOrDefaultAsync(u => u.Id == req.UserId);
+      .FirstOrDefaultAsync(u => u.Id == req.UserId);
             if (user == null)
                 return CommonResponse<GetLoginRequestRes>.Fail(ResponseCodeEnum.ERR_USER_NOT_EXIST, "User không tồn tại");
 
@@ -109,8 +125,8 @@ namespace MyProject.Application.Services
                 return (CommonResponse<bool>.Fail(ResponseCodeEnum.ERR_WRONG_INPUT, "Thiếu thông tin đăng nhập"), null);
 
             var userList = await _userRepository.AsQueryable()
-                .Where(x => x.UserName == req.UserName)
-                .ToListAsync();
+           .Where(x => x.UserName == req.UserName)
+         .ToListAsync();
 
             var user = userList.FirstOrDefault(x => _cryptoHelperUtil.Decrypt(x.PasswordHash) == req.Password);
 
@@ -123,36 +139,8 @@ namespace MyProject.Application.Services
             return (CommonResponse<bool>.Success(true, ResponseCodeEnum.SUCCESS, "Đăng nhập thành công"), user);
         }
 
+       
 
-        public async Task<CommonResponse<string>> LoginByUser(LoginCmsRequest req)
-        {
-            var (check, user) = await CheckAcc(req);
-            if (check.ResponseCode != (int)ResponseCodeEnum.SUCCESS)
-            {
-                return CommonResponse<string>.Fail((ResponseCodeEnum)check.ResponseCode, check.Message);
-            }
-            var httpContext = _httpContextAccessor.HttpContext;
-
-            string? ipAddress = httpContext?.Connection.RemoteIpAddress?.ToString();
-            string? deviceInfo = httpContext?.Request.Headers["User-Agent"].ToString();
-            var sendMessage = new CommonMessage<object>
-            {
-                MessageId = 1,
-                Method = "LoginRequest",
-                Data = new LoginDataReq
-                {
-                    UserId = user.Id,
-                    UserName = user.UserName,
-                    IpAddress = ipAddress,
-                    DeviceInfo = deviceInfo
-                }
-            };
-
-            var json = System.Text.Json.JsonSerializer.Serialize(sendMessage);
-            await _tcpSocketService.SendMessageAsync(json);
-
-            return CommonResponse<string>.Success(null, ResponseCodeEnum.SUCCESS, "Đăng nhập thành công");
-        }
         public async Task<CommonResponse<string>> Register(RegisterReq req)
         {
             if (string.IsNullOrWhiteSpace(req.UserName) || string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.Password))
@@ -161,7 +149,7 @@ namespace MyProject.Application.Services
             }
 
             var existUser = await _userRepository.AsQueryable()
-                .AnyAsync(u => u.UserName == req.UserName || u.Email == req.Email);
+        .AnyAsync(u => u.UserName == req.UserName || u.Email == req.Email);
             if (existUser)
             {
                 return CommonResponse<string>.Fail(ResponseCodeEnum.ERR_EXISTUSER, "Tài khoản hoặc email đã tồn tại");
@@ -186,11 +174,11 @@ namespace MyProject.Application.Services
             return CommonResponse<string>.Success(null, ResponseCodeEnum.SUCCESS, "Đăng ký thành công");
         }
 
-
         private async Task<Guid> GetDefaultRoleIdAsync()
         {
             var role = await _roleRepository.AsQueryable().FirstOrDefaultAsync(r => r.Name == "User");
             if (role != null) return role.Id;
+
             var newRole = new Roles
             {
                 Id = Guid.NewGuid(),
@@ -202,6 +190,9 @@ namespace MyProject.Application.Services
             return newRole.Id;
         }
 
+        /// <summary>
+        /// Get Login Requests - Có thể gọi từ cả Web API và TCP Server
+        /// </summary>
         public async Task<CommonPagination<List<GetLoginRequestRes>>> GetLoginRequest(int? Status, string? UserName, int CurrentPage, int RecordPerPage)
         {
             var query = from lr in _loginRequestRepository.AsQueryable()
@@ -232,9 +223,9 @@ namespace MyProject.Application.Services
             var totalCount = await query.CountAsync();
 
             var items = await query
-                .Skip((CurrentPage - 1) * RecordPerPage)
-                .Take(RecordPerPage)
-                .ToListAsync();
+      .Skip((CurrentPage - 1) * RecordPerPage)
+ .Take(RecordPerPage)
+  .ToListAsync();
 
             return new CommonPagination<List<GetLoginRequestRes>>
             {
@@ -244,7 +235,12 @@ namespace MyProject.Application.Services
                 TotalRecord = totalCount
             };
         }
-        public async Task<CommonResponse<string>> AcceptLoginRequest(Guid AdminId,AcceptLoginRequestReq req)
+
+        /// <summary>
+        /// Accept/Reject Login Request - Được gọi từ TCP Server khi admin approve/reject
+        /// KHÔNG gửi message qua TCP Socket vì TCP Server tự handle việc này
+        /// </summary>
+        public async Task<CommonResponse<string>> AcceptLoginRequest(Guid AdminId, AcceptLoginRequestReq req)
         {
             if (req.LoginRequestId == Guid.Empty)
                 return CommonResponse<string>.Fail(ResponseCodeEnum.ERR_WRONG_INPUT, "Thiếu LoginRequestId");
@@ -277,29 +273,17 @@ namespace MyProject.Application.Services
             await _loginRequestRepository.UpdateAsync(loginRequest);
             await _loginRequestRepository.SaveChangesAsync();
 
-            var sendMessage = new CommonMessage<DataAcceptLoginRes>
-            {
-                MessageId = 1,
-                Method = "AcceptLogin",
-                Data = new DataAcceptLoginRes
-                {
-                    UserName = user.UserName,
-                    AdminId = loginRequest.ReviewedByAdminId ?? Guid.Empty,
-                    LoginRequestId = loginRequest.Id,
-                    Status = loginRequest.Status,
-                    UserId = loginRequest.UserId,
-                    DeviceInfo = loginRequest.DeviceInfo,
-                    IpAddress = loginRequest.IpAddress
-                }
-            };
-
-            var json = System.Text.Json.JsonSerializer.Serialize(sendMessage);
-            await _tcpSocketService.SendMessageAsync(json);
+            // KHÔNG gửi message qua TCP Socket ở đây
+            // TCP Server sẽ tự handle việc broadcast đến clients
 
             string statusText = req.Status == 1 ? "chấp nhận" : "từ chối";
             return CommonResponse<string>.Success(loginRequest.Id.ToString(), ResponseCodeEnum.SUCCESS, $"Login request đã được {statusText}");
         }
 
+        /// <summary>
+        /// Login By Admin - Dùng cho admin login vào CMS/Admin panel
+        /// Không liên quan đến TCP Socket
+        /// </summary>
         public async Task<CommonResponse<LoginCmsResponse>> LoginByAdmin(LoginCmsRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.UserName) || string.IsNullOrWhiteSpace(req.Password))
@@ -319,7 +303,21 @@ namespace MyProject.Application.Services
             if (userData == null)
                 return CommonResponse<LoginCmsResponse>.Fail(ResponseCodeEnum.ERR_WRONG_USERNAME_PASS, "Sai tài khoản hoặc mật khẩu");
 
-            var decryptedPassword = _cryptoHelperUtil.Decrypt(userData.User.PasswordHash);
+            // ✅ Check PasswordHash is not null or empty
+            if (string.IsNullOrWhiteSpace(userData.User.PasswordHash))
+                return CommonResponse<LoginCmsResponse>.Fail(ResponseCodeEnum.ERR_WRONG_USERNAME_PASS, "Sai tài khoản hoặc mật khẩu");
+
+            string decryptedPassword;
+            try
+            {
+                decryptedPassword = _cryptoHelperUtil.Decrypt(userData.User.PasswordHash);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Failed to decrypt password: {ex.Message}");
+                return CommonResponse<LoginCmsResponse>.Fail(ResponseCodeEnum.ERR_WRONG_USERNAME_PASS, "Sai tài khoản hoặc mật khẩu");
+            }
+
             if (decryptedPassword != req.Password)
                 return CommonResponse<LoginCmsResponse>.Fail(ResponseCodeEnum.ERR_WRONG_USERNAME_PASS, "Sai tài khoản hoặc mật khẩu");
 
@@ -335,14 +333,14 @@ namespace MyProject.Application.Services
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
+                AdminId = userData.User.Id
             };
 
             return CommonResponse<LoginCmsResponse>.Success(
-                loginResponse,
-                ResponseCodeEnum.SUCCESS,
-                "Đăng nhập thành công"
-            );
+                     loginResponse,
+                         ResponseCodeEnum.SUCCESS,
+              "Đăng nhập thành công"
+                  );
         }
-
     }
 }
