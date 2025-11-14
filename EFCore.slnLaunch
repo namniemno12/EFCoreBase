@@ -5,6 +5,14 @@
       {
         "Path": "TcpSocketServer\\TcpSocketServer.csproj",
         "Action": "Start"
+      },
+      {
+        "Path": "UI\\ClientUI.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "AdminUI\\AdminUI.csproj",
+        "Action": "Start"
       }
     ]
   }
