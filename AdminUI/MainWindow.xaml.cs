@@ -25,13 +25,17 @@ namespace AdminUI
         private string _accessToken = string.Empty;
         private string _refreshToken = string.Empty;
         private ObservableCollection<LoginRequestItem> _loginRequests;
-        private readonly Notifier _notifier;
+        private Notifier? _notifier;
 
         // ✅ NEW: Constructor nhận connection đã authenticated và tokens từ LoginWindow
         public MainWindow(string adminName, Guid adminId, TcpClient client, NetworkStream stream,
-          string accessToken, string refreshToken)
+        string accessToken, string refreshToken)
         {
+            Console.WriteLine("🏗️ MainWindow: Constructor started");
+
             InitializeComponent();
+
+            Console.WriteLine("✅ MainWindow: InitializeComponent completed");
 
             _adminName = adminName;
             _adminId = adminId;
@@ -42,23 +46,13 @@ namespace AdminUI
             _isRunning = true;
 
             _loginRequests = new ObservableCollection<LoginRequestItem>();
-            LoginRequestsDataGrid.ItemsSource = _loginRequests;
 
-            // Initialize Toast Notifier
-            _notifier = new Notifier(cfg =>
-           {
-               cfg.PositionProvider = new WindowPositionProvider(
-   parentWindow: this,
-       corner: Corner.TopRight,
-     offsetX: 10,
-    offsetY: 10);
+            // ✅ Bind to ItemsControl (simplest control)
+            LoginRequestsItemsControl.ItemsSource = _loginRequests;
+            Console.WriteLine("✅ MainWindow: ItemsControl binding enabled");
 
-               cfg.LifetimeSupervisor = new TimeAndCountBasedLifetimeSupervisor(
-            notificationLifetime: TimeSpan.FromSeconds(3),
-                  maximumNotificationCount: MaximumNotificationCount.FromCount(3));
-
-               cfg.Dispatcher = Application.Current.Dispatcher;
-           });
+            // ✅ Initialize Toast Notifier in Loaded event instead of constructor
+            this.Loaded += MainWindow_Loaded;
 
             // Update UI
             AdminIdTextBlock.Text = _adminId == Guid.Empty ? "Waiting for server..." : _adminId.ToString("N").Substring(0, 16) + "...";
@@ -69,7 +63,81 @@ namespace AdminUI
             LogActivity($"✅ Logged in as: {_adminName}");
             LogActivity($"🔑 Token: {_accessToken[..20]}...");
 
-            _ = Task.Run(ListenForMessagesAsync);
+            Console.WriteLine("✅ MainWindow: Constructor completed");
+
+            // ✅ IMPORTANT: Start TCP listener AFTER window is loaded
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Console.WriteLine("🏗️ MainWindow: Loaded event triggered");
+
+                // ✅ TEMPORARY: Disable Notifier to debug StaticResource error
+                /*
+                  _notifier = new Notifier(cfg =>
+               {
+                  cfg.PositionProvider = new WindowPositionProvider(
+            parentWindow: this,
+              corner: Corner.TopRight,
+     offsetX: 10,
+        offsetY: 10);
+
+                cfg.LifetimeSupervisor = new TimeAndCountBasedLifetimeSupervisor(
+         notificationLifetime: TimeSpan.FromSeconds(3),
+       maximumNotificationCount: MaximumNotificationCount.FromCount(3));
+
+                  cfg.Dispatcher = Application.Current.Dispatcher;
+                   });
+                */
+                Console.WriteLine("⚠️ MainWindow: Notifier disabled for debugging");
+
+                // ✅ Start listening for messages AFTER window is fully loaded
+                Console.WriteLine("🚀 MainWindow: Starting TCP listener...");
+                _ = Task.Run(ListenForMessagesAsync);
+                Console.WriteLine("✅ MainWindow: TCP listener started");
+
+                // ✅ Request pending login requests from server
+                _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(500); // Đợi listener ready
+                        await RequestPendingLoginRequestsAsync();
+                    });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainWindow: Failed to initialize: {ex.Message}");
+                Console.WriteLine($"❌ MainWindow: StackTrace: {ex.StackTrace}");
+            }
+        }
+
+        private async Task RequestPendingLoginRequestsAsync()
+        {
+            try
+            {
+                Console.WriteLine("📤 MainWindow: Requesting pending login requests...");
+
+                var message = new
+                {
+                    Method = "GetPendingRequests",
+                    Data = new { }
+                };
+
+                var json = JsonSerializer.Serialize(message);
+                var bytes = Encoding.UTF8.GetBytes(json);
+                await _stream!.WriteAsync(bytes, 0, bytes.Length);
+
+                Console.WriteLine("✅ MainWindow: GetPendingRequests sent successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainWindow: Failed to request pending requests: {ex.Message}");
+                Dispatcher.Invoke(() =>
+                  {
+                      LogActivity($"❌ Failed to get pending requests: {ex.Message}");
+                  });
+            }
         }
 
         private async Task ListenForMessagesAsync()
@@ -87,36 +155,63 @@ namespace AdminUI
 
                     var json = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
+                    Console.WriteLine($"📥 MainWindow: Received message: {json}");
+
                     Dispatcher.Invoke(() =>
                      {
                          try
                          {
+                             Console.WriteLine("📝 MainWindow: Parsing message...");
+
                              var doc = JsonDocument.Parse(json);
                              var method = doc.RootElement.GetProperty("Method").GetString();
+
+                             Console.WriteLine($"📝 MainWindow: Method = {method}");
 
                              switch (method)
                              {
                                  case "PendingLoginRequests":
+                                     Console.WriteLine("📝 MainWindow: Handling PendingLoginRequests...");
                                      HandlePendingLoginRequests(doc.RootElement);
                                      break;
 
                                  case "NewLoginRequest":
+                                     Console.WriteLine("📝 MainWindow: Handling NewLoginRequest...");
                                      HandleNewLoginRequest(doc.RootElement);
                                      break;
 
                                  case "AcceptLoginAck":
+                                     Console.WriteLine("📝 MainWindow: Handling AcceptLoginAck...");
                                      HandleAcceptLoginAck(doc.RootElement);
                                      break;
 
                                  case "Error":
+                                     Console.WriteLine("📝 MainWindow: Handling Error...");
                                      HandleError(doc.RootElement);
                                      break;
+
+                                 default:
+                                     Console.WriteLine($"⚠️ MainWindow: Unknown method: {method}");
+                                     break;
                              }
+
+                             Console.WriteLine("✅ MainWindow: Message handled successfully");
                          }
                          catch (Exception ex)
                          {
+                             Console.WriteLine($"❌ MainWindow: Error parsing/handling message!");
+                             Console.WriteLine($"❌ MainWindow: Exception Type: {ex.GetType().Name}");
+                             Console.WriteLine($"❌ MainWindow: Exception Message: {ex.Message}");
+                             Console.WriteLine($"❌ MainWindow: StackTrace: {ex.StackTrace}");
+
+                             if (ex.InnerException != null)
+                             {
+                                 Console.WriteLine($"❌ MainWindow: Inner Exception: {ex.InnerException.Message}");
+                                 Console.WriteLine($"❌ MainWindow: Inner StackTrace: {ex.InnerException.StackTrace}");
+                             }
+
                              LogActivity($"⚠️ Error parsing message: {ex.Message}");
-                             _notifier.ShowError($"❌ Error: {ex.Message}");
+                             _notifier?.ShowError($"❌ Error: {ex.Message}");
                          }
                      });
                 }
@@ -124,45 +219,65 @@ namespace AdminUI
                 {
                     if (_isRunning)
                     {
+                        Console.WriteLine($"❌ MainWindow: Connection error: {ex.Message}");
+
                         Dispatcher.Invoke(() =>
-             {
-                 LogActivity($"⚠️ Connection error: {ex.Message}");
-                 _notifier.ShowError($"❌ Connection lost: {ex.Message}");
-                 UpdateConnectionStatus(false);
-             });
+                       {
+                           LogActivity($"⚠️ Connection error: {ex.Message}");
+                           _notifier?.ShowError($"❌ Connection lost: {ex.Message}");
+                           UpdateConnectionStatus(false);
+                       });
                     }
                     break;
                 }
             }
+
+            Console.WriteLine("⛔ MainWindow: ListenForMessagesAsync ended");
         }
 
         private void HandlePendingLoginRequests(JsonElement root)
         {
-            var data = root.GetProperty("Data");
-            var count = data.GetProperty("Count").GetInt32();
-            var requests = data.GetProperty("Requests");
-
-            _loginRequests.Clear();
-
-            foreach (var req in requests.EnumerateArray())
+            try
             {
-                var item = new LoginRequestItem
+                Console.WriteLine("📋 MainWindow: HandlePendingLoginRequests started");
+
+                var data = root.GetProperty("Data");
+                var count = data.GetProperty("Count").GetInt32();
+                var requests = data.GetProperty("Requests");
+
+                Console.WriteLine($"📋 MainWindow: Count = {count}");
+
+                _loginRequests.Clear();
+
+                foreach (var req in requests.EnumerateArray())
                 {
-                    LoginRequestId = Guid.Parse(req.GetProperty("LoginRequestId").GetString()!),
-                    UserId = Guid.Parse(req.GetProperty("UserId").GetString()!),
-                    UserName = req.GetProperty("UserName").GetString() ?? "",
-                    IpAddress = req.GetProperty("IpAddress").GetString() ?? "N/A",
-                    DeviceInfo = req.GetProperty("DeviceInfo").GetString() ?? "N/A",
-                    RequestedAt = req.GetProperty("RequestedAt").GetDateTime(),
-                    Status = req.GetProperty("Status").GetInt32()
-                };
+                    Console.WriteLine($"📋 MainWindow: Processing request...");
 
-                _loginRequests.Add(item);
+                    var item = new LoginRequestItem
+                    {
+                        LoginRequestId = Guid.Parse(req.GetProperty("LoginRequestId").GetString()!),
+                        UserId = Guid.Parse(req.GetProperty("UserId").GetString()!),
+                        UserName = req.GetProperty("UserName").GetString() ?? "",
+                        IpAddress = req.GetProperty("IpAddress").GetString() ?? "N/A",
+                        DeviceInfo = req.GetProperty("DeviceInfo").GetString() ?? "N/A",
+                        RequestedAt = req.GetProperty("RequestedAt").GetDateTime(),
+                        Status = req.GetProperty("Status").GetInt32()
+                    };
+
+                    _loginRequests.Add(item);
+                    Console.WriteLine($"📋 MainWindow: Added request for {item.UserName}");
+                }
+
+                UpdatePendingCount();
+                LogActivity($"📋 Loaded {count} pending request(s)");
+                _notifier?.ShowInformation($"📋 {count} login requests pending");
+
+                Console.WriteLine("✅ MainWindow: HandlePendingLoginRequests completed");
             }
-
-            UpdatePendingCount();
-            LogActivity($"📋 Loaded {count} pending request(s)");
-            _notifier.ShowInformation($"📋 {count} login requests pending");
+            catch (Exception ex)
+            {
+                return;
+            }
         }
 
         private void HandleNewLoginRequest(JsonElement root)
@@ -185,7 +300,7 @@ namespace AdminUI
             UpdatePendingCount();
 
             LogActivity($"🔔 New login request from: {item.UserName}");
-            _notifier.ShowInformation($"🔔 New login from {item.UserName}");
+            _notifier?.ShowInformation($"🔔 New login from {item.UserName}");
 
             // Visual/Audio notification
             System.Media.SystemSounds.Beep.Play();
@@ -206,7 +321,7 @@ namespace AdminUI
             }
 
             LogActivity($"✅ {message}");
-            _notifier.ShowSuccess($"✅ {message}");
+            _notifier?.ShowSuccess($"✅ {message}");
         }
 
         private void HandleError(JsonElement root)
@@ -214,7 +329,7 @@ namespace AdminUI
             var data = root.GetProperty("Data");
             var errorMessage = data.GetProperty("Message").GetString();
             LogActivity($"❌ Server Error: {errorMessage}");
-            _notifier.ShowError($"❌ {errorMessage}");
+            _notifier?.ShowError($"❌ {errorMessage}");
         }
 
         private async void ApproveButton_Click(object sender, RoutedEventArgs e)
@@ -267,7 +382,7 @@ namespace AdminUI
             catch (Exception ex)
             {
                 LogActivity($"❌ Error sending response: {ex.Message}");
-                _notifier.ShowError($"❌ Failed to send response");
+                _notifier?.ShowError($"❌ Failed to send response");
             }
         }
 
@@ -310,7 +425,7 @@ namespace AdminUI
             _isRunning = false;
             _stream?.Close();
             _client?.Close();
-            _notifier.Dispose();
+            _notifier?.Dispose();
             base.OnClosed(e);
         }
     }

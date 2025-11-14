@@ -586,13 +586,17 @@ options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
 
                 await SendJsonAsync(connection.Stream, response);
 
-                // Tự động gửi danh sách pending requests
-                await HandleGetPendingRequestsAsync(connection);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ HandleAdminConnect error: {ex.Message}");
-                Console.WriteLine($"⚠️ Stack trace: {ex.StackTrace}");
+                // ✅ KHÔNG tự động gửi pending requests nữa
+                // MainWindow sẽ gửi GetPendingRequests message sau khi ready
+// await HandleGetPendingRequestsAsync(connection);
+          
+                Console.WriteLine($"✅ HandleAdminConnect: Completed successfully for {adminData.AdminName}");
+                Console.WriteLine($"⏳ HandleAdminConnect: Waiting for client to request pending requests...");
+ }
+       catch (Exception ex)
+    {
+Console.WriteLine($"⚠️ HandleAdminConnect error: {ex.Message}");
+        Console.WriteLine($"⚠️ Stack trace: {ex.StackTrace}");
                 await SendErrorAsync(connection.Stream, "Error processing admin connection");
             }
         }
@@ -752,7 +756,11 @@ options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
         {
             try
             {
+                Console.WriteLine($"📋 HandleGetPendingRequests: Starting for admin {connection.UserName}");
+      
                 var pendingRequests = _pendingLoginRequests.Values.ToList();
+
+                Console.WriteLine($"📋 HandleGetPendingRequests: Found {pendingRequests.Count} pending requests");
 
                 var response = new MessageEnvelope
                 {
@@ -764,12 +772,17 @@ options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
                     }
                 };
 
+                var json = System.Text.Json.JsonSerializer.Serialize(response);
+                Console.WriteLine($"📋 HandleGetPendingRequests: Sending response: {json.Substring(0, Math.Min(200, json.Length))}...");
+
                 await SendJsonAsync(connection.Stream, response);
-                Console.WriteLine($"📋 Sent {pendingRequests.Count} pending request(s) to admin");
+               
+                Console.WriteLine($"✅ HandleGetPendingRequests: Sent {pendingRequests.Count} pending request(s) to admin");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"⚠️ HandleGetPendingRequests error: {ex.Message}");
+                Console.WriteLine($"⚠️ Stack trace: {ex.StackTrace}");
                 await SendErrorAsync(connection.Stream, "Error getting pending requests");
             }
         }
@@ -782,13 +795,24 @@ options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
         {
             try
             {
+                Console.WriteLine($"📤 SendJsonAsync: Serializing object of type {obj.GetType().Name}");
+     
                 var json = JsonSerializer.Serialize(obj);
+    
+                Console.WriteLine($"📤 SendJsonAsync: JSON length = {json.Length} bytes");
+ Console.WriteLine($"📤 SendJsonAsync: Writing to stream...");
+       
                 var bytes = Encoding.UTF8.GetBytes(json);
                 await stream.WriteAsync(bytes, 0, bytes.Length);
+   await stream.FlushAsync(); // ✅ IMPORTANT: Flush stream
+    
+                Console.WriteLine($"✅ SendJsonAsync: Successfully sent {bytes.Length} bytes");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Error sending JSON: {ex.Message}");
+                Console.WriteLine($"⚠️ SendJsonAsync error: {ex.Message}");
+                Console.WriteLine($"⚠️ Stack trace: {ex.StackTrace}");
+                throw; // Re-throw to handle in caller
             }
         }
 

@@ -22,6 +22,11 @@ namespace AdminUI
         {
             base.OnStartup(e);
 
+            // ✅ Global exception handlers
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            Application.Current.DispatcherUnhandledException += Current_DispatcherUnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
             try
             {
                 Console.WriteLine("🚀 App: OnStartup called");
@@ -47,6 +52,47 @@ namespace AdminUI
 
                 Shutdown();
             }
+        }
+
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            var ex = e.ExceptionObject as Exception;
+            Console.WriteLine($"❌❌❌ UNHANDLED EXCEPTION (CurrentDomain): {ex?.Message}");
+            Console.WriteLine($"❌ StackTrace: {ex?.StackTrace}");
+
+            MessageBox.Show(
+                $"CRITICAL ERROR:\n\n{ex?.Message}\n\nApplication will terminate.",
+                "Critical Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+
+        private void Current_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            Console.WriteLine($"❌❌❌ UNHANDLED EXCEPTION (Dispatcher): {e.Exception.Message}");
+            Console.WriteLine($"❌ StackTrace: {e.Exception.StackTrace}");
+
+            if (e.Exception.InnerException != null)
+            {
+                Console.WriteLine($"❌ Inner Exception: {e.Exception.InnerException.Message}");
+                Console.WriteLine($"❌ Inner StackTrace: {e.Exception.InnerException.StackTrace}");
+            }
+
+            MessageBox.Show(
+                $"DISPATCHER ERROR:\n\n{e.Exception.Message}\n\nSee console for details.",
+                "Dispatcher Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            e.Handled = true; // Prevent app crash
+        }
+
+        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Console.WriteLine($"❌❌❌ UNHANDLED TASK EXCEPTION: {e.Exception.Message}");
+            Console.WriteLine($"❌ StackTrace: {e.Exception.StackTrace}");
+
+            e.SetObserved(); // Prevent app crash
         }
 
         private void ConfigureServices(IServiceCollection services)

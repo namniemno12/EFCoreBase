@@ -275,5 +275,12 @@ namespace UI
             _stream?.Close();
             _client?.Close();
         }
+
+        private void RegisterLink_Click(object sender, RoutedEventArgs e)
+        {
+            var registerWindow = new RegisterWindow();
+            registerWindow.Show();
+            this.Close();
+        }
     }
 }
