@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration; // ✅ Add this
 
 namespace UI
 {
@@ -32,8 +34,17 @@ namespace UI
             try
             {
                 LogMessage("🔄 Connecting to server...");
+                
+                // ✅ Đọc server host từ configuration
+                var configuration = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+   .GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(App.ServiceProvider);
+               var serverHost = configuration.GetValue<string>("TcpServer:Host", "localhost");
+   var serverPort = configuration.GetValue<int>("TcpServer:Port", 9000);
+
+                LogMessage($"📡 Target server: {serverHost}:{serverPort}");
+
                 _client = new TcpClient();
-                await _client.ConnectAsync("localhost", 9000);
+                await _client.ConnectAsync(serverHost, serverPort);
                 _stream = _client.GetStream();
                 _isRunning = true;
 

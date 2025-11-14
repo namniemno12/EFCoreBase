@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration; // ✅ Add this
 
 namespace AdminUI
 {
@@ -89,10 +90,18 @@ namespace AdminUI
                 // ✅ Step 2: Connect TCP
                 Console.WriteLine("🔌 LoginWindow: Connecting to TCP Socket Server...");
 
+                // ✅ Đọc server host từ configuration
+                var configuration = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                  .GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(App.ServiceProvider);
+                  var serverHost = configuration.GetValue<string>("TcpServer:Host", "localhost");
+ var serverPort = configuration.GetValue<int>("TcpServer:Port", 9000);
+
+                  Console.WriteLine($"🔌 LoginWindow: Target server: {serverHost}:{serverPort}");
+
                 var tcpClient = new TcpClient();
 
                 // Set timeout
-                var connectTask = tcpClient.ConnectAsync("localhost", 9000);
+                var connectTask = tcpClient.ConnectAsync(serverHost, serverPort);
                 var timeoutTask = System.Threading.Tasks.Task.Delay(5000);
 
                 var completedTask = await System.Threading.Tasks.Task.WhenAny(connectTask, timeoutTask);
