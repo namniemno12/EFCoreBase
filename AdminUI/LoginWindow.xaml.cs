@@ -197,7 +197,8 @@ namespace AdminUI
                     tcpClient,
                     stream,
                     accessToken,
-                    refreshToken);
+                    refreshToken,
+                    _authServices);
 
                 // ✅ ẨN LoginWindow thay vì đóng để giữ TCP connection alive
                 this.Hide();

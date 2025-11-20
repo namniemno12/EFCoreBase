@@ -135,6 +135,8 @@ namespace UI
                 LogMessage($"\n{message}");
                 LogMessage($"📝 Request ID: {loginRequestId}");
                 LogMessage("⏳ Waiting for admin approval...\n");
+
+                MessageBox.Show("Đã gửi yêu cầu xác thực!", "Login Request", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
@@ -144,6 +146,11 @@ namespace UI
                 LogMessage("❌ ═══════════════════════════");
                 LogMessage($"{message}");
                 LogMessage("═══════════════════════════\n");
+                string errorMsg =
+          "❌ LOGIN FAILED ❌\n\n" +
+          $"{message}";
+
+                MessageBox.Show(errorMsg, "Login Failed", MessageBoxButton.OK, MessageBoxImage.Error);
 
                 // Re-enable login button để user có thể thử lại
                 Dispatcher.Invoke(() => LoginButton.IsEnabled = true);
@@ -158,36 +165,74 @@ namespace UI
 
             if (isSuccess)
             {
+                // ✅ LOGIN APPROVED - Navigate to Welcome Window
                 LogMessage("\n🎉 ═══════════════════════════");
                 LogMessage("🎉   LOGIN APPROVED!   🎉");
                 LogMessage("🎉 ═══════════════════════════");
                 LogMessage($"✅ {message}");
 
-                if (data.TryGetProperty("ApprovedBy", out var approvedBy))
+                string approvedBy = "Admin";
+                DateTime approvedTime = DateTime.Now;
+
+                if (data.TryGetProperty("ApprovedBy", out var approvedByProperty))
                 {
-                    LogMessage($"👔 Approved by: {approvedBy.GetString()}");
+                    approvedBy = approvedByProperty.GetString() ?? "Admin";
+                    LogMessage($"👔 Approved by: {approvedBy}");
                 }
 
-                if (data.TryGetProperty("ApprovedAt", out var approvedAt))
+                if (data.TryGetProperty("ApprovedAt", out var approvedAtProperty))
                 {
-                    LogMessage($"🕐 Time: {approvedAt.GetDateTime():yyyy-MM-dd HH:mm:ss}");
+                    approvedTime = approvedAtProperty.GetDateTime();
+                    LogMessage($"🕐 Time: {approvedTime:yyyy-MM-dd HH:mm:ss}");
                 }
 
                 LogMessage("═══════════════════════════\n");
+
+                Dispatcher.Invoke(() =>
+                {
+                    // Show welcome window
+                    var welcomeWindow = new WelcomeWindow(
+                        UsernameTextBox.Text,
+                        approvedBy,
+                        approvedTime
+                    );
+                    
+                    welcomeWindow.Show();
+                    
+                    // Close current login window
+                    this.Close();
+                });
             }
             else
             {
+                // ❌ LOGIN REJECTED - Show MessageBox only
+                string msg =
+                    "❌ LOGIN REJECTED ❌\n\n" +
+                    $"⚠️ {message}\n";
+
                 LogMessage("\n❌ ═══════════════════════════");
                 LogMessage("❌   LOGIN REJECTED   ❌");
                 LogMessage("❌ ═══════════════════════════");
                 LogMessage($"⚠️ {message}");
 
-                if (data.TryGetProperty("RejectedBy", out var rejectedBy))
+                string rejectedBy = "Admin";
+                if (data.TryGetProperty("RejectedBy", out var rejectedByProperty))
                 {
-                    LogMessage($"👔 Rejected by: {rejectedBy.GetString()}");
+                    rejectedBy = rejectedByProperty.GetString() ?? "Admin";
+                    LogMessage($"👔 Rejected by: {rejectedBy}");
+                    msg += $"👔 Rejected by: {rejectedBy}\n";
                 }
 
                 LogMessage("═══════════════════════════\n");
+
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(msg, "Login Rejected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    
+                    LoginButton.IsEnabled = true;
+                    PasswordBox.Clear();
+                    PasswordBox.Focus();
+                });
             }
         }
 
@@ -260,12 +305,14 @@ namespace UI
                     StatusIndicator.Fill = new SolidColorBrush(Colors.LimeGreen);
                     StatusText.Text = "Connected";
                     StatusText.Foreground = new SolidColorBrush(Colors.Green);
+                    StatusText.FontWeight = FontWeights.Bold;
                 }
                 else
                 {
                     StatusIndicator.Fill = new SolidColorBrush(Colors.Red);
                     StatusText.Text = "Disconnected";
                     StatusText.Foreground = new SolidColorBrush(Colors.Red);
+                    StatusText.FontWeight = FontWeights.Normal;
                     LoginButton.IsEnabled = false;
                 }
             });

@@ -32,6 +32,11 @@ namespace AdminUI
         private readonly IAuthServices _authServices;
         private Notifier? _notifier;
 
+        // Pagination
+        private int _currentPage = 1;
+        private int _recordPerPage = 10;
+        private int _totalPages = 1;
+
         // ✅ NEW: Constructor nhận connection đã authenticated và tokens từ LoginWindow
         public MainWindow(string adminName, Guid adminId, TcpClient client, NetworkStream stream,
         string accessToken, string refreshToken, IAuthServices authServices)
@@ -49,11 +54,14 @@ namespace AdminUI
             _accessToken = accessToken;
             _refreshToken = refreshToken;
             _isRunning = true;
+            _authServices = authServices;
 
             _loginRequests = new ObservableCollection<LoginRequestItem>();
+            _loginHistory = new ObservableCollection<LoginHistoryItem>();
 
             // ✅ Bind to ItemsControl (simplest control)
             LoginRequestsItemsControl.ItemsSource = _loginRequests;
+            LoginHistoryDataGrid.ItemsSource = _loginHistory;
             Console.WriteLine("✅ MainWindow: ItemsControl binding enabled");
 
             // ✅ Initialize Toast Notifier in Loaded event instead of constructor
@@ -69,7 +77,6 @@ namespace AdminUI
             LogActivity($"🔑 Token: {_accessToken[..20]}...");
 
             Console.WriteLine("✅ MainWindow: Constructor completed");
-            _authServices = authServices;
 
             // ✅ IMPORTANT: Start TCP listener AFTER window is loaded
         }
@@ -112,6 +119,13 @@ namespace AdminUI
                     await Task.Delay(500); // Đợi listener ready
                     await RequestPendingLoginRequestsAsync();
                 });
+
+                // ✅ Load login history from database
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1000);
+                    await LoadLoginHistoryAsync();
+                });
             }
             catch (Exception ex)
             {
@@ -144,6 +158,59 @@ namespace AdminUI
                 Dispatcher.Invoke(() =>
                 {
                     LogActivity($"❌ Failed to get pending requests: {ex.Message}");
+                });
+            }
+        }
+
+        private async Task LoadLoginHistoryAsync()
+        {
+            try
+            {
+                Console.WriteLine("📤 MainWindow: Loading login history from database...");
+
+                var result = await _authServices.GetLoginHistory(_currentPage, _recordPerPage);
+
+                if (result.ResponseCode == 200 && result.Data != null)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        _loginHistory.Clear();
+                        foreach (var item in result.Data)
+                        {
+                            _loginHistory.Add(new LoginHistoryItem
+                            {
+                                LoginHistoryId = item.LoginHistoryId,
+                                UserId = item.UserId,
+                                UserName = item.UserName ?? "",
+                                FullName = item.FullName ?? "",
+                                IpAddress = item.IpAddress ?? "",
+                                DeviceInfo = item.DeviceInfo ?? "",
+                                LoginTime = item.LoginTime,
+                                IsSuccessful = item.IsSuccessful
+                            });
+                        }
+
+                        // Update pagination
+                        _totalPages = (int)Math.Ceiling((double)result.TotalRecord / _recordPerPage);
+                        UpdatePaginationUI();
+
+                        LogActivity($"✅ Loaded {result.Data.Count} login history records (Page {_currentPage}/{_totalPages})");
+                    });
+                }
+                else
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        LogActivity($"⚠️ Failed to load login history: {result.Message}");
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainWindow: Failed to load login history: {ex.Message}");
+                Dispatcher.Invoke(() =>
+                {
+                    LogActivity($"❌ Error loading history: {ex.Message}");
                 });
             }
         }
@@ -192,16 +259,16 @@ namespace AdminUI
                                     Console.WriteLine("📝 MainWindow: Handling AcceptLoginAck...");
                                     HandleAcceptLoginAck(doc.RootElement);
                                     break;
+
                                 case "LoginHistory":
+                                    Console.WriteLine("📝 MainWindow: Handling LoginHistory...");
                                     HandleLoginHistory(doc.RootElement);
                                     break;
-
 
                                 case "Error":
                                     Console.WriteLine("📝 MainWindow: Handling Error...");
                                     HandleError(doc.RootElement);
                                     break;
-
 
                                 default:
                                     Console.WriteLine($"⚠️ MainWindow: Unknown method: {method}");
@@ -289,7 +356,7 @@ namespace AdminUI
             }
             catch (Exception ex)
             {
-                return;
+                Console.WriteLine($"❌ MainWindow: Error in HandlePendingLoginRequests: {ex.Message}");
             }
         }
 
@@ -318,29 +385,37 @@ namespace AdminUI
             // Visual/Audio notification
             System.Media.SystemSounds.Beep.Play();
         }
+
         private void HandleLoginHistory(JsonElement root)
         {
-            var data = root.GetProperty("Data");
+            try
+            {
+                var data = root.GetProperty("Data");
 
-            
-               var item = new GetLoginHistory
-               {
+                var item = new LoginHistoryItem
+                {
+                    LoginHistoryId = Guid.Parse(data.GetProperty("LoginHistoryId").GetString()!),
+                    UserId = Guid.Parse(data.GetProperty("UserId").GetString()!),
+                    UserName = data.GetProperty("UserName").GetString() ?? "",
+                    FullName = data.GetProperty("FullName").GetString() ?? "",
+                    IpAddress = data.GetProperty("IpAddress").GetString() ?? "",
+                    DeviceInfo = data.GetProperty("DeviceInfo").GetString() ?? "",
+                    LoginTime = data.GetProperty("LoginTime").GetDateTime(),
+                    IsSuccessful = data.GetProperty("IsSuccessful").GetBoolean()
+                };
 
+                // Add to top of history list (real-time notification)
+                _loginHistory.Insert(0, item);
 
-                   LoginHistoryId = Guid.Parse(data.GetProperty("LoginHistoryId").GetString()!),
-                   UserId = Guid.Parse(data.GetProperty("UserId").GetString()!),
-                   UserName = data.GetProperty("UserName").GetString() ?? "",
-                   FullName = data.GetProperty("FullName").GetString() ?? "",
-                   IpAddress = data.GetProperty("IpAddress").GetString() ?? "",
-                   DeviceInfo = data.GetProperty("DeviceInfo").GetString() ?? "",
-                   LoginTime = data.GetProperty("LoginTime").GetDateTime(),
-                   IsSuccessful = data.GetProperty("IsSuccessful").GetBoolean()
-               };
-            HistoryActivity($"🕑 {item.UserName} logged in | IP: {item.IpAddress} | Device: {item.DeviceInfo}");
-            _authServices.GetLoginHistory(int current, int recordPerPage);
-        _notifier?.ShowInformation($"🕑 {item.UserName} logged in");
+                LogActivity($"🕑 {item.UserName} logged in | IP: {item.IpAddress} | Device: {item.DeviceInfo}");
+                _notifier?.ShowInformation($"🕑 {item.UserName} logged in");
 
-        System.Media.SystemSounds.Beep.Play();
+                System.Media.SystemSounds.Beep.Play();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainWindow: Error in HandleLoginHistory: {ex.Message}");
+            }
         }
         
         private void HandleAcceptLoginAck(JsonElement root)
@@ -424,6 +499,37 @@ namespace AdminUI
             }
         }
 
+        private async void RefreshHistoryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadLoginHistoryAsync();
+        }
+
+        private async void PrevPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPage > 1)
+            {
+                _currentPage--;
+                await LoadLoginHistoryAsync();
+            }
+        }
+
+        private async void NextPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPage < _totalPages)
+            {
+                _currentPage++;
+                await LoadLoginHistoryAsync();
+            }
+        }
+
+        private void UpdatePaginationUI()
+        {
+            CurrentPageTextRun.Text = _currentPage.ToString();
+            TotalPagesTextRun.Text = _totalPages.ToString();
+            PrevPageButton.IsEnabled = _currentPage > 1;
+            NextPageButton.IsEnabled = _currentPage < _totalPages;
+        }
+
         private void UpdateConnectionStatus(bool isConnected)
         {
             Dispatcher.Invoke(() =>
@@ -457,15 +563,6 @@ namespace AdminUI
                 ActivityLogTextBlock.Text += $"[{timestamp}] {message}\n";
             });
         }
-        private void HistoryActivity(string message)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                var timestamp = DateTime.Now.ToString("HH:mm:ss");
-                LoginHistoryTextBlock.Text += $"[{timestamp}] {message}\n";
-            });
-        }
-
 
         protected override void OnClosed(EventArgs e)
         {
@@ -477,6 +574,7 @@ namespace AdminUI
         }
     }
 
+    // Model classes
     public class LoginRequestItem
     {
         public Guid LoginRequestId { get; set; }
@@ -487,6 +585,7 @@ namespace AdminUI
         public DateTime RequestedAt { get; set; }
         public int Status { get; set; }
     }
+
     public class LoginHistoryItem
     {
         public Guid LoginHistoryId { get; set; }
@@ -498,6 +597,4 @@ namespace AdminUI
         public DateTime LoginTime { get; set; }
         public bool IsSuccessful { get; set; }
     }
-
-
 }
