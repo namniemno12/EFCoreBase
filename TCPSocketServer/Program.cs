@@ -663,6 +663,34 @@ Console.WriteLine($"⚠️ HandleAdminConnect error: {ex.Message}");
                         if (historyResult.ResponseCode == (int)MyProject.Helper.Constants.Globals.ResponseCodeEnum.SUCCESS)
                         {
                             Console.WriteLine($"💾 Login history saved with ID: {historyResult.Data}");
+
+                            // ✅ Broadcast LoginHistory realtime đến tất cả admin
+                            var userRepository = scope.ServiceProvider.GetRequiredService<IRepositoryAsync<Users>>();
+                            var user = await userRepository.AsQueryable()
+                                .Where(x => x.Id == loginRequest.UserId)
+                                .FirstOrDefaultAsync();
+
+                            if (user != null)
+                            {
+                                var loginHistoryBroadcast = new MessageEnvelope
+                                {
+                                    Method = "LoginHistory",
+                                    Data = new
+                                    {
+                                        LoginHistoryId = historyResult.Data,
+                                        UserId = user.Id,
+                                        UserName = user.UserName,
+                                        FullName = user.FullName ?? "",
+                                        IpAddress = loginRequest.IpAddress,
+                                        DeviceInfo = loginRequest.DeviceInfo,
+                                        LoginTime = DateTime.UtcNow,
+                                        IsSuccessful = true
+                                    }
+                                };
+
+                                await BroadcastToAdminsAsync(loginHistoryBroadcast);
+                                Console.WriteLine($"📢 Broadcasted login history to {_adminConnections.Count} admin(s)");
+                            }
                         }
                     }
                 }
@@ -683,7 +711,9 @@ Console.WriteLine($"⚠️ HandleAdminConnect error: {ex.Message}");
                             LoginRequestId = acceptData.LoginRequestId,
                             ApprovedBy = connection.UserName,
                             ApprovedAt = DateTime.UtcNow,
-                            Status = acceptData.Status
+                            Status = acceptData.Status,
+                            // ✅ Only send UserId - client will load full info from database
+                            UserId = loginRequest.UserId
                         }
                     };
 

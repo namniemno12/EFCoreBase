@@ -1,32 +1,68 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Animation;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using MyProject.Domain.Entities;
+using MyProject.Infrastructure;
 
 namespace UI
 {
     public partial class WelcomeWindow : Window
     {
-        private readonly string _username;
+        private readonly Guid _userId;
         private readonly string _approvedBy;
         private readonly DateTime _approvedTime;
 
-        public WelcomeWindow(string username, string approvedBy, DateTime approvedTime)
+        public WelcomeWindow(Guid userId, string approvedBy, DateTime approvedTime)
         {
             InitializeComponent();
 
-            _username = username;
+            _userId = userId;
             _approvedBy = approvedBy;
             _approvedTime = approvedTime;
 
-            LoadUserInfo();
+            // Load user info from database
+            Loaded += async (s, e) => await LoadUserInfoAsync();
+            
             PlayWelcomeAnimation();
         }
 
-        private void LoadUserInfo()
+        private async Task LoadUserInfoAsync()
         {
-            UsernameTextBlock.Text = _username;
-            ApprovedByTextBlock.Text = _approvedBy;
-            ApprovedTimeTextBlock.Text = _approvedTime.ToString("yyyy-MM-dd HH:mm:ss");
+            try
+            {
+                using (var scope = App.ServiceProvider.CreateScope())
+                {
+                    var userRepository = scope.ServiceProvider.GetRequiredService<IRepositoryAsync<Users>>();
+                    
+                    var user = await userRepository.AsQueryable()
+                        .Where(x => x.Id == _userId)
+                        .FirstOrDefaultAsync();
+
+                    if (user != null)
+                    {
+                        UsernameTextBlock.Text = user.UserName;
+                        FullNameTextBlock.Text = string.IsNullOrEmpty(user.FullName) ? "N/A" : user.FullName;
+                        EmailTextBlock.Text = string.IsNullOrEmpty(user.Email) ? "N/A" : user.Email;
+                        PhoneTextBlock.Text = string.IsNullOrEmpty(user.PhoneNumber) ? "N/A" : user.PhoneNumber;
+                        ApprovedByTextBlock.Text = _approvedBy;
+                        ApprovedTimeTextBlock.Text = _approvedTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to load user information!", "Error", 
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading user info: {ex.Message}", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void PlayWelcomeAnimation()
@@ -47,7 +83,7 @@ namespace UI
         {
             // TODO: Navigate to main dashboard or application screen
             MessageBox.Show(
-                $"Welcome to the system, {_username}!\n\n" +
+                $"Welcome to the system, {FullNameTextBlock.Text}!\n\n" +
                 "Dashboard functionality will be implemented here.",
                 "Dashboard",
                 MessageBoxButton.OK,

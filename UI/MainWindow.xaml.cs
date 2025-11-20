@@ -173,6 +173,7 @@ namespace UI
 
                 string approvedBy = "Admin";
                 DateTime approvedTime = DateTime.Now;
+                Guid userId = Guid.Empty;
 
                 if (data.TryGetProperty("ApprovedBy", out var approvedByProperty))
                 {
@@ -186,13 +187,31 @@ namespace UI
                     LogMessage($"🕐 Time: {approvedTime:yyyy-MM-dd HH:mm:ss}");
                 }
 
+                // ✅ Extract UserId from response
+                if (data.TryGetProperty("UserId", out var userIdProperty))
+                {
+                    if (Guid.TryParse(userIdProperty.GetString(), out var parsedUserId))
+                    {
+                        userId = parsedUserId;
+                        LogMessage($"👤 User ID: {userId}");
+                    }
+                }
+
+                if (userId == Guid.Empty)
+                {
+                    LogMessage("❌ Failed to get User ID from server response");
+                    MessageBox.Show("Error: Invalid user ID received from server", "Error", 
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
                 LogMessage("═══════════════════════════\n");
 
                 Dispatcher.Invoke(() =>
                 {
-                    // Show welcome window
+                    // Show welcome window with UserId - it will load user info from database
                     var welcomeWindow = new WelcomeWindow(
-                        UsernameTextBox.Text,
+                        userId,
                         approvedBy,
                         approvedTime
                     );
