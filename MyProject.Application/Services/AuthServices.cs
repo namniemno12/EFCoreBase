@@ -235,6 +235,58 @@ namespace MyProject.Application.Services
                 TotalRecord = totalCount
             };
         }
+        public async Task<CommonPagination<List<GetLoginHistory>>> GetLoginHistory(int CurrentPage, int RecordPerPage)
+        {
+            // đảm bảo giá trị hợp lệ
+            if (CurrentPage <= 0) CurrentPage = 1;
+            if (RecordPerPage <= 0) RecordPerPage = 10; // mặc định
+
+            try
+            {
+                var baseQuery = from lh in _loginHistoryRepository.AsQueryable()
+                                join u in _userRepository.AsQueryable()
+                                    on lh.UserId equals u.Id
+                                orderby lh.LoginTime descending
+                                select new GetLoginHistory
+                                {
+                                    UserId = u.Id,
+                                    UserName = u.UserName,
+                                    LoginTime = lh.LoginTime,
+                                    IpAddress = lh.IpAddress,
+                                    DeviceInfo = lh.DeviceInfo,
+                                    IsSuccessful = lh.IsSuccessful
+                                };
+
+                // tổng số record (trước khi phân trang)
+                var totalRecord = await baseQuery.CountAsync();
+
+                var skip = (CurrentPage - 1) * RecordPerPage;
+                var pagedData = await baseQuery
+                    .Skip(skip)
+                    .Take(RecordPerPage)
+                    .ToListAsync();
+
+                var response = new CommonPagination<List<GetLoginHistory>>
+                {
+                    ResponseCode = (int)ResponseCodeEnum.SUCCESS,
+                    Message = "Lấy lịch sử đăng nhập thành công",
+                    Data = pagedData,
+                    TotalRecord = totalRecord
+                };
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                return new CommonPagination<List<GetLoginHistory>>
+                {
+                    ResponseCode = (int)ResponseCodeEnum.ERR_API_NOT_FOUND, // hoặc mã lỗi phù hợp
+                    Message = "Có lỗi trong quá trình lấy lịch sử đăng nhập: " + ex.Message,
+                    Data = new List<GetLoginHistory>(),
+                    TotalRecord = 0
+                };
+            }
+        }
 
         /// <summary>
         /// Accept/Reject Login Request - Được gọi từ TCP Server khi admin approve/reject

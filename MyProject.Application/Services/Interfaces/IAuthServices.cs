@@ -7,6 +7,8 @@ namespace MyProject.Application.Services.Interfaces
     public interface IAuthServices
     {
         Task<CommonResponse<string>> Register(RegisterReq req);
+        Task<CommonPagination<List<GetLoginHistory>>> GetLoginHistory(int CurrentPage, int RecordPerPage);
+
         Task<CommonResponse<string>> AddLoginHistory(AddLoginHistoryReq req);
         Task<CommonResponse<GetLoginRequestRes>> AddLoginRequest(AddLoginRequestReq req);
         Task<CommonResponse<LoginCmsResponse>> LoginByAdmin(LoginCmsRequest req);

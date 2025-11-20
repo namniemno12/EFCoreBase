@@ -1,4 +1,7 @@
-﻿using System;
+﻿using MyProject.Application.Services.Interfaces;
+using MyProject.Domain.DTOs.Auth.Req;
+using MyProject.Domain.Entities;
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Sockets;
@@ -24,12 +27,14 @@ namespace AdminUI
         private string _adminName = string.Empty;
         private string _accessToken = string.Empty;
         private string _refreshToken = string.Empty;
-        private ObservableCollection<LoginRequestItem> _loginRequests;
+        private ObservableCollection<LoginRequestItem> _loginRequests = new();
+        private ObservableCollection<LoginHistoryItem> _loginHistory = new();
+        private readonly IAuthServices _authServices;
         private Notifier? _notifier;
 
         // ✅ NEW: Constructor nhận connection đã authenticated và tokens từ LoginWindow
         public MainWindow(string adminName, Guid adminId, TcpClient client, NetworkStream stream,
-        string accessToken, string refreshToken)
+        string accessToken, string refreshToken, IAuthServices authServices)
         {
             Console.WriteLine("🏗️ MainWindow: Constructor started");
 
@@ -64,6 +69,7 @@ namespace AdminUI
             LogActivity($"🔑 Token: {_accessToken[..20]}...");
 
             Console.WriteLine("✅ MainWindow: Constructor completed");
+            _authServices = authServices;
 
             // ✅ IMPORTANT: Start TCP listener AFTER window is loaded
         }
@@ -91,6 +97,8 @@ namespace AdminUI
                   cfg.Dispatcher = Application.Current.Dispatcher;
                    });
                 */
+              
+
                 Console.WriteLine("⚠️ MainWindow: Notifier disabled for debugging");
 
                 // ✅ Start listening for messages AFTER window is fully loaded
@@ -100,10 +108,10 @@ namespace AdminUI
 
                 // ✅ Request pending login requests from server
                 _ = Task.Run(async () =>
-                    {
-                        await Task.Delay(500); // Đợi listener ready
-                        await RequestPendingLoginRequestsAsync();
-                    });
+                {
+                    await Task.Delay(500); // Đợi listener ready
+                    await RequestPendingLoginRequestsAsync();
+                });
             }
             catch (Exception ex)
             {
@@ -134,9 +142,9 @@ namespace AdminUI
             {
                 Console.WriteLine($"❌ MainWindow: Failed to request pending requests: {ex.Message}");
                 Dispatcher.Invoke(() =>
-                  {
-                      LogActivity($"❌ Failed to get pending requests: {ex.Message}");
-                  });
+                {
+                    LogActivity($"❌ Failed to get pending requests: {ex.Message}");
+                });
             }
         }
 
@@ -158,62 +166,67 @@ namespace AdminUI
                     Console.WriteLine($"📥 MainWindow: Received message: {json}");
 
                     Dispatcher.Invoke(() =>
-                     {
-                         try
-                         {
-                             Console.WriteLine("📝 MainWindow: Parsing message...");
+                    {
+                        try
+                        {
+                            Console.WriteLine("📝 MainWindow: Parsing message...");
 
-                             var doc = JsonDocument.Parse(json);
-                             var method = doc.RootElement.GetProperty("Method").GetString();
+                            var doc = JsonDocument.Parse(json);
+                            var method = doc.RootElement.GetProperty("Method").GetString();
 
-                             Console.WriteLine($"📝 MainWindow: Method = {method}");
+                            Console.WriteLine($"📝 MainWindow: Method = {method}");
 
-                             switch (method)
-                             {
-                                 case "PendingLoginRequests":
-                                     Console.WriteLine("📝 MainWindow: Handling PendingLoginRequests...");
-                                     HandlePendingLoginRequests(doc.RootElement);
-                                     break;
+                            switch (method)
+                            {
+                                case "PendingLoginRequests":
+                                    Console.WriteLine("📝 MainWindow: Handling PendingLoginRequests...");
+                                    HandlePendingLoginRequests(doc.RootElement);
+                                    break;
 
-                                 case "NewLoginRequest":
-                                     Console.WriteLine("📝 MainWindow: Handling NewLoginRequest...");
-                                     HandleNewLoginRequest(doc.RootElement);
-                                     break;
+                                case "NewLoginRequest":
+                                    Console.WriteLine("📝 MainWindow: Handling NewLoginRequest...");
+                                    HandleNewLoginRequest(doc.RootElement);
+                                    break;
 
-                                 case "AcceptLoginAck":
-                                     Console.WriteLine("📝 MainWindow: Handling AcceptLoginAck...");
-                                     HandleAcceptLoginAck(doc.RootElement);
-                                     break;
+                                case "AcceptLoginAck":
+                                    Console.WriteLine("📝 MainWindow: Handling AcceptLoginAck...");
+                                    HandleAcceptLoginAck(doc.RootElement);
+                                    break;
+                                case "LoginHistory":
+                                    HandleLoginHistory(doc.RootElement);
+                                    break;
 
-                                 case "Error":
-                                     Console.WriteLine("📝 MainWindow: Handling Error...");
-                                     HandleError(doc.RootElement);
-                                     break;
 
-                                 default:
-                                     Console.WriteLine($"⚠️ MainWindow: Unknown method: {method}");
-                                     break;
-                             }
+                                case "Error":
+                                    Console.WriteLine("📝 MainWindow: Handling Error...");
+                                    HandleError(doc.RootElement);
+                                    break;
 
-                             Console.WriteLine("✅ MainWindow: Message handled successfully");
-                         }
-                         catch (Exception ex)
-                         {
-                             Console.WriteLine($"❌ MainWindow: Error parsing/handling message!");
-                             Console.WriteLine($"❌ MainWindow: Exception Type: {ex.GetType().Name}");
-                             Console.WriteLine($"❌ MainWindow: Exception Message: {ex.Message}");
-                             Console.WriteLine($"❌ MainWindow: StackTrace: {ex.StackTrace}");
 
-                             if (ex.InnerException != null)
-                             {
-                                 Console.WriteLine($"❌ MainWindow: Inner Exception: {ex.InnerException.Message}");
-                                 Console.WriteLine($"❌ MainWindow: Inner StackTrace: {ex.InnerException.StackTrace}");
-                             }
+                                default:
+                                    Console.WriteLine($"⚠️ MainWindow: Unknown method: {method}");
+                                    break;
+                            }
 
-                             LogActivity($"⚠️ Error parsing message: {ex.Message}");
-                             _notifier?.ShowError($"❌ Error: {ex.Message}");
-                         }
-                     });
+                            Console.WriteLine("✅ MainWindow: Message handled successfully");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ MainWindow: Error parsing/handling message!");
+                            Console.WriteLine($"❌ MainWindow: Exception Type: {ex.GetType().Name}");
+                            Console.WriteLine($"❌ MainWindow: Exception Message: {ex.Message}");
+                            Console.WriteLine($"❌ MainWindow: StackTrace: {ex.StackTrace}");
+
+                            if (ex.InnerException != null)
+                            {
+                                Console.WriteLine($"❌ MainWindow: Inner Exception: {ex.InnerException.Message}");
+                                Console.WriteLine($"❌ MainWindow: Inner StackTrace: {ex.InnerException.StackTrace}");
+                            }
+
+                            LogActivity($"⚠️ Error parsing message: {ex.Message}");
+                            _notifier?.ShowError($"❌ Error: {ex.Message}");
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -222,11 +235,11 @@ namespace AdminUI
                         Console.WriteLine($"❌ MainWindow: Connection error: {ex.Message}");
 
                         Dispatcher.Invoke(() =>
-                       {
-                           LogActivity($"⚠️ Connection error: {ex.Message}");
-                           _notifier?.ShowError($"❌ Connection lost: {ex.Message}");
-                           UpdateConnectionStatus(false);
-                       });
+                        {
+                            LogActivity($"⚠️ Connection error: {ex.Message}");
+                            _notifier?.ShowError($"❌ Connection lost: {ex.Message}");
+                            UpdateConnectionStatus(false);
+                        });
                     }
                     break;
                 }
@@ -305,7 +318,31 @@ namespace AdminUI
             // Visual/Audio notification
             System.Media.SystemSounds.Beep.Play();
         }
+        private void HandleLoginHistory(JsonElement root)
+        {
+            var data = root.GetProperty("Data");
 
+            
+               var item = new GetLoginHistory
+               {
+
+
+                   LoginHistoryId = Guid.Parse(data.GetProperty("LoginHistoryId").GetString()!),
+                   UserId = Guid.Parse(data.GetProperty("UserId").GetString()!),
+                   UserName = data.GetProperty("UserName").GetString() ?? "",
+                   FullName = data.GetProperty("FullName").GetString() ?? "",
+                   IpAddress = data.GetProperty("IpAddress").GetString() ?? "",
+                   DeviceInfo = data.GetProperty("DeviceInfo").GetString() ?? "",
+                   LoginTime = data.GetProperty("LoginTime").GetDateTime(),
+                   IsSuccessful = data.GetProperty("IsSuccessful").GetBoolean()
+               };
+            HistoryActivity($"🕑 {item.UserName} logged in | IP: {item.IpAddress} | Device: {item.DeviceInfo}");
+            _authServices.GetLoginHistory(int current, int recordPerPage);
+        _notifier?.ShowInformation($"🕑 {item.UserName} logged in");
+
+        System.Media.SystemSounds.Beep.Play();
+        }
+        
         private void HandleAcceptLoginAck(JsonElement root)
         {
             var data = root.GetProperty("Data");
@@ -323,7 +360,8 @@ namespace AdminUI
             LogActivity($"✅ {message}");
             _notifier?.ShowSuccess($"✅ {message}");
         }
-
+       
+            
         private void HandleError(JsonElement root)
         {
             var data = root.GetProperty("Data");
@@ -389,36 +427,45 @@ namespace AdminUI
         private void UpdateConnectionStatus(bool isConnected)
         {
             Dispatcher.Invoke(() =>
-       {
-           if (isConnected)
-           {
-               AdminStatusIndicator.Fill = new SolidColorBrush(Colors.LimeGreen);
-               AdminStatusText.Text = "Connected";
-           }
-           else
-           {
-               AdminStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
-               AdminStatusText.Text = "Disconnected";
-           }
-       });
+            {
+                if (isConnected)
+                {
+                    AdminStatusIndicator.Fill = new SolidColorBrush(Colors.LimeGreen);
+                    AdminStatusText.Text = "Connected";
+                }
+                else
+                {
+                    AdminStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                    AdminStatusText.Text = "Disconnected";
+                }
+            });
         }
 
         private void UpdatePendingCount()
         {
             Dispatcher.Invoke(() =>
-              {
-                  TotalPendingTextBlock.Text = _loginRequests.Count.ToString();
-              });
+            {
+                TotalPendingTextBlock.Text = _loginRequests.Count.ToString();
+            });
         }
 
         private void LogActivity(string message)
         {
             Dispatcher.Invoke(() =>
-        {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss");
-            ActivityLogTextBlock.Text += $"[{timestamp}] {message}\n";
-        });
+            {
+                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                ActivityLogTextBlock.Text += $"[{timestamp}] {message}\n";
+            });
         }
+        private void HistoryActivity(string message)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                LoginHistoryTextBlock.Text += $"[{timestamp}] {message}\n";
+            });
+        }
+
 
         protected override void OnClosed(EventArgs e)
         {
@@ -440,4 +487,17 @@ namespace AdminUI
         public DateTime RequestedAt { get; set; }
         public int Status { get; set; }
     }
+    public class LoginHistoryItem
+    {
+        public Guid LoginHistoryId { get; set; }
+        public Guid UserId { get; set; }
+        public string UserName { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string IpAddress { get; set; } = "";
+        public string DeviceInfo { get; set; } = "";
+        public DateTime LoginTime { get; set; }
+        public bool IsSuccessful { get; set; }
+    }
+
+
 }

@@ -7,11 +7,11 @@
         "Action": "Start"
       },
       {
-        "Path": "UI\\ClientUI.csproj",
+        "Path": "AdminUI\\AdminUI.csproj",
         "Action": "Start"
       },
       {
-        "Path": "AdminUI\\AdminUI.csproj",
+        "Path": "UI\\ClientUI.csproj",
         "Action": "Start"
       }
     ]
