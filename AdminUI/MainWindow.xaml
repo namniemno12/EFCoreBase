@@ -150,6 +150,98 @@
                             </StackPanel>
                         </Grid>
                     </TabItem>
+
+                    <!-- TAB 3: USER MANAGEMENT -->
+                    <TabItem Header="User Management">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- SEARCH AND REFRESH -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+                                <TextBlock Text="🔍" FontSize="20" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox x:Name="UserSearchTextBox" Width="200" Height="35" 
+                                         VerticalContentAlignment="Center" Margin="0,0,10,0"
+                                         TextChanged="UserSearchTextBox_TextChanged"
+                                         Tag="Search by username, email, or name..."/>
+                                <Button x:Name="RefreshUsersButton" Content="🔄 Refresh Users" 
+                                        Width="150" Height="35" Background="#2196F3" Foreground="White" 
+                                        BorderThickness="0" Click="RefreshUsersButton_Click"/>
+                                <TextBlock VerticalAlignment="Center" Margin="20,0,0,0">
+                                    <Run Text="Total Users: "/>
+                                    <Run x:Name="TotalUsersTextRun" Text="0" FontWeight="Bold" Foreground="#1976D2"/>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <!-- USERS GRID -->
+                            <DataGrid Grid.Row="1" x:Name="UsersDataGrid" 
+                                      AutoGenerateColumns="False" IsReadOnly="True"
+                                      Background="White" AlternatingRowBackground="#F9F9F9"
+                                      GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                      RowHeight="40">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Username" Binding="{Binding UserName}" Width="120"/>
+                                    <DataGridTextColumn Header="Full Name" Binding="{Binding FullName}" Width="150"/>
+                                    <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="180"/>
+                                    <DataGridTextColumn Header="Phone" Binding="{Binding PhoneNumber}" Width="120"/>
+                                    <DataGridTextColumn Header="Created At" Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm:ss'}" Width="150"/>
+                                    <DataGridTemplateColumn Header="Status" Width="80">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding IsActive, Converter={StaticResource BoolToStatusConverter}}" 
+                                                           Foreground="{Binding IsActive, Converter={StaticResource BoolToColorConverter}}"
+                                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="Actions" Width="150">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <Button Content="👁️ View" Width="60" Height="28" 
+                                                            Background="#2196F3" Foreground="White" BorderThickness="0"
+                                                            Click="ViewUserButton_Click" Tag="{Binding}" Margin="0,0,5,0"/>
+                                                    <Button Content="🔒 Lock" Width="60" Height="28"
+                                                            Background="#FF9800" Foreground="White" BorderThickness="0"
+                                                            Click="ToggleUserStatusButton_Click" Tag="{Binding}">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Content" Value="🔒 Lock"/>
+                                                                <Setter Property="Background" Value="#FF9800"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                                        <Setter Property="Content" Value="🔓 Unlock"/>
+                                                                        <Setter Property="Background" Value="#4CAF50"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- PAGINATION FOR USERS -->
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+                                <Button x:Name="UsersPrevPageButton" Content="« Previous" Width="100" Height="30" 
+                                        Margin="0,0,10,0" Click="UsersPrevPageButton_Click"/>
+                                <TextBlock VerticalAlignment="Center" Margin="10,0">
+                                    <Run Text="Page "/>
+                                    <Run x:Name="UsersCurrentPageTextRun" Text="1"/>
+                                    <Run Text=" of "/>
+                                    <Run x:Name="UsersTotalPagesTextRun" Text="1"/>
+                                </TextBlock>
+                                <Button x:Name="UsersNextPageButton" Content="Next »" Width="100" Height="30" 
+                                        Margin="10,0,0,0" Click="UsersNextPageButton_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </TabItem>
                 </TabControl>
 
                 <!-- LOGS -->

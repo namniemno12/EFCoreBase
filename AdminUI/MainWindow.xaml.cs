@@ -1,6 +1,9 @@
 ﻿using MyProject.Application.Services.Interfaces;
 using MyProject.Domain.DTOs.Auth.Req;
 using MyProject.Domain.Entities;
+using MyProject.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -29,13 +32,20 @@ namespace AdminUI
         private string _refreshToken = string.Empty;
         private ObservableCollection<LoginRequestItem> _loginRequests = new();
         private ObservableCollection<LoginHistoryItem> _loginHistory = new();
+        private ObservableCollection<UserManagementItem> _users = new();
+        private ObservableCollection<UserManagementItem> _filteredUsers = new();
         private readonly IAuthServices _authServices;
         private Notifier? _notifier;
 
-        // Pagination
+        // Pagination for Login History
         private int _currentPage = 1;
         private int _recordPerPage = 10;
         private int _totalPages = 1;
+
+        // Pagination for Users
+        private int _usersCurrentPage = 1;
+        private int _usersRecordPerPage = 10;
+        private int _usersTotalPages = 1;
 
         // ✅ NEW: Constructor nhận connection đã authenticated và tokens từ LoginWindow
         public MainWindow(string adminName, Guid adminId, TcpClient client, NetworkStream stream,
@@ -58,10 +68,14 @@ namespace AdminUI
 
             _loginRequests = new ObservableCollection<LoginRequestItem>();
             _loginHistory = new ObservableCollection<LoginHistoryItem>();
+            _users = new ObservableCollection<UserManagementItem>();
+            _filteredUsers = new ObservableCollection<UserManagementItem>();
 
             // ✅ Bind to ItemsControl (simplest control)
             LoginRequestsItemsControl.ItemsSource = _loginRequests;
             LoginHistoryDataGrid.ItemsSource = _loginHistory;
+            UsersDataGrid.ItemsSource = _filteredUsers;
+
             Console.WriteLine("✅ MainWindow: ItemsControl binding enabled");
 
             // ✅ Initialize Toast Notifier in Loaded event instead of constructor
@@ -125,6 +139,13 @@ namespace AdminUI
                 {
                     await Task.Delay(1000);
                     await LoadLoginHistoryAsync();
+                });
+
+                // ✅ Load users list
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1500);
+                    await LoadUsersAsync();
                 });
             }
             catch (Exception ex)
@@ -522,6 +543,203 @@ namespace AdminUI
             }
         }
 
+        #region User Management Methods
+
+        private async Task LoadUsersAsync()
+        {
+            try
+            {
+                Console.WriteLine("📤 MainWindow: Loading users from database...");
+
+                using (var scope = App.ServiceProvider.CreateScope())
+                {
+                    var userRepository = scope.ServiceProvider.GetRequiredService<IRepositoryAsync<Users>>();
+                    var roleRepository = scope.ServiceProvider.GetRequiredService<IRepositoryAsync<Roles>>();
+
+                    // Get "User" role
+                    var userRole = await roleRepository.AsQueryable()
+                        .Where(r => r.Name.ToLower() == "user")
+                        .FirstOrDefaultAsync();
+
+                    if (userRole == null)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            LogActivity("⚠️ User role not found in database");
+                        });
+                        return;
+                    }
+
+                    // Get all users with "User" role
+                    var users = await userRepository.AsQueryable()
+                        .Where(u => u.RoleId == userRole.Id)
+                        .OrderByDescending(u => u.CreatedAt)
+                        .ToListAsync();
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        _users.Clear();
+                        _filteredUsers.Clear();
+
+                        foreach (var user in users)
+                        {
+                            var item = new UserManagementItem
+                            {
+                                UserId = user.Id,
+                                UserName = user.UserName,
+                                FullName = user.FullName ?? "",
+                                Email = user.Email,
+                                PhoneNumber = user.PhoneNumber ?? "",
+                                IsActive = user.IsActive,
+                                CreatedAt = user.CreatedAt,
+                                RoleId = user.RoleId
+                            };
+                            _users.Add(item);
+                            _filteredUsers.Add(item);
+                        }
+
+                        // Update pagination
+                        _usersTotalPages = (int)Math.Ceiling((double)_filteredUsers.Count / _usersRecordPerPage);
+                        UpdateUsersPaginationUI();
+
+                        TotalUsersTextRun.Text = _users.Count.ToString();
+
+                        LogActivity($"✅ Loaded {_users.Count} users from database");
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainWindow: Failed to load users: {ex.Message}");
+                Dispatcher.Invoke(() =>
+                {
+                    LogActivity($"❌ Error loading users: {ex.Message}");
+                });
+            }
+        }
+
+        private void UpdateUsersPaginationUI()
+        {
+            UsersCurrentPageTextRun.Text = _usersCurrentPage.ToString();
+            UsersTotalPagesTextRun.Text = _usersTotalPages.ToString();
+            UsersPrevPageButton.IsEnabled = _usersCurrentPage > 1;
+            UsersNextPageButton.IsEnabled = _usersCurrentPage < _usersTotalPages;
+        }
+
+        private async void RefreshUsersButton_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadUsersAsync();
+        }
+
+        private async void UsersPrevPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_usersCurrentPage > 1)
+            {
+                _usersCurrentPage--;
+                UpdateUsersPaginationUI();
+            }
+        }
+
+        private async void UsersNextPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_usersCurrentPage < _usersTotalPages)
+            {
+                _usersCurrentPage++;
+                UpdateUsersPaginationUI();
+            }
+        }
+
+        private void UserSearchTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            var searchText = UserSearchTextBox.Text.ToLower();
+
+            _filteredUsers.Clear();
+
+            foreach (var user in _users)
+            {
+                if (string.IsNullOrWhiteSpace(searchText) ||
+                    user.UserName.ToLower().Contains(searchText) ||
+                    user.FullName.ToLower().Contains(searchText) ||
+                    user.Email.ToLower().Contains(searchText))
+                {
+                    _filteredUsers.Add(user);
+                }
+            }
+
+            // Update pagination after filter
+            _usersTotalPages = (int)Math.Ceiling((double)_filteredUsers.Count / _usersRecordPerPage);
+            _usersCurrentPage = 1;
+            UpdateUsersPaginationUI();
+
+            LogActivity($"🔍 Search: Found {_filteredUsers.Count} users matching '{searchText}'");
+        }
+
+        private void ViewUserButton_Click(object sender, RoutedEventArgs e)
+        {
+            var button = (Button)sender;
+            var user = (UserManagementItem)button.Tag;
+
+            var message = $"User Details:\n\n" +
+                          $"Username: {user.UserName}\n" +
+                          $"Full Name: {user.FullName}\n" +
+                          $"Email: {user.Email}\n" +
+                          $"Phone: {user.PhoneNumber}\n" +
+                          $"Status: {(user.IsActive ? "Active" : "Locked")}\n" +
+                          $"Created: {user.CreatedAt:yyyy-MM-dd HH:mm:ss}";
+
+            MessageBox.Show(message, "User Details", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            LogActivity($"👁️ Viewed details for user: {user.UserName}");
+        }
+
+        private async void ToggleUserStatusButton_Click(object sender, RoutedEventArgs e)
+        {
+            var button = (Button)sender;
+            var user = (UserManagementItem)button.Tag;
+
+            var action = user.IsActive ? "lock" : "unlock";
+            var result = MessageBox.Show(
+                $"Are you sure you want to {action} user '{user.UserName}'?",
+                $"Confirm {action.ToUpper()}",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    using (var scope = App.ServiceProvider.CreateScope())
+                    {
+                        var userRepository = scope.ServiceProvider.GetRequiredService<IRepositoryAsync<Users>>();
+
+                        var dbUser = await userRepository.AsQueryable()
+                            .Where(u => u.Id == user.UserId)
+                            .FirstOrDefaultAsync();
+
+                        if (dbUser != null)
+                        {
+                            dbUser.IsActive = !dbUser.IsActive;
+                            await userRepository.UpdateAsync(dbUser);
+
+                            // Update UI
+                            user.IsActive = dbUser.IsActive;
+                            await LoadUsersAsync(); // Refresh list
+
+                            LogActivity($"🔒 User {user.UserName} {(dbUser.IsActive ? "unlocked" : "locked")} successfully");
+                            _notifier?.ShowSuccess($"User {user.UserName} {(dbUser.IsActive ? "unlocked" : "locked")} successfully");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogActivity($"❌ Error toggling user status: {ex.Message}");
+                    _notifier?.ShowError($"Failed to {action} user");
+                }
+            }
+        }
+
+        #endregion
+
         private void UpdatePaginationUI()
         {
             CurrentPageTextRun.Text = _currentPage.ToString();
@@ -596,5 +814,18 @@ namespace AdminUI
         public string DeviceInfo { get; set; } = "";
         public DateTime LoginTime { get; set; }
         public bool IsSuccessful { get; set; }
+    }
+
+    // Model class for User Management
+    public class UserManagementItem
+    {
+        public Guid UserId { get; set; }
+        public string UserName { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string PhoneNumber { get; set; } = "";
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public Guid RoleId { get; set; }
     }
 }
